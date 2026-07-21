@@ -4,4 +4,7 @@
     <Project Path="src/Qplus.Core/Qplus.Core.csproj" />
     <Project Path="src/Qplus.Server/Qplus.Server.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Qplus.ReaderTests/Qplus.ReaderTests.csproj" />
+  </Folder>
 </Solution>
