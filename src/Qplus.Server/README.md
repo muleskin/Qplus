@@ -6,6 +6,26 @@ directions: local changes are uploaded, server changes are downloaded.
 It is a small ASP.NET Core service with a SQLite file behind it. It holds only query text —
 **no database credentials and no connection details ever leave the client.**
 
+## Quick start
+
+A `Makefile` automates everything below. Run `make` on its own to list the targets.
+
+```bash
+make publish            # single self-contained binary -> ./out/Qplus.Server
+sudo make service       # install to /opt/qplus, write the unit, enable and start
+make status             # unit state plus a health check
+make logs               # follow the journal
+```
+
+Override any setting on the command line:
+
+```bash
+make publish RID=linux-arm64
+sudo make install PORT=8080 API_KEY=$(openssl rand -hex 24)
+```
+
+The rest of this document explains what those targets do, and how to do the same by hand.
+
 ## Configuration
 
 All settings come from environment variables, so nothing needs editing to deploy.
