@@ -1,0 +1,20 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- Light palette. Same accent as the Q+ app icon (#2D8CFF). -->
+    <SolidColorBrush x:Key="Brush.Bg"          Color="#FFF5F5F5"/>
+    <SolidColorBrush x:Key="Brush.Panel"       Color="#FFECECEC"/>
+    <SolidColorBrush x:Key="Brush.Border"      Color="#FFC8C8C8"/>
+    <SolidColorBrush x:Key="Brush.Text"        Color="#FF1E1E1E"/>
+    <SolidColorBrush x:Key="Brush.Subtle"      Color="#FF666666"/>
+    <SolidColorBrush x:Key="Brush.Accent"      Color="#FF2D8CFF"/>
+    <SolidColorBrush x:Key="Brush.AccentHover" Color="#FF1177BB"/>
+    <SolidColorBrush x:Key="Brush.Control"     Color="#FFFFFFFF"/>
+    <SolidColorBrush x:Key="Brush.ControlText" Color="#FF1E1E1E"/>
+    <SolidColorBrush x:Key="Brush.Hover"       Color="#FFDDEBFF"/>
+    <SolidColorBrush x:Key="Brush.SelectionBg" Color="#FFCCE4FF"/>
+    <SolidColorBrush x:Key="Brush.EditorBg"    Color="#FFFFFFFF"/>
+    <SolidColorBrush x:Key="Brush.EditorText"  Color="#FF1E1E1E"/>
+    <SolidColorBrush x:Key="Brush.GridBg"      Color="#FFFFFFFF"/>
+    <SolidColorBrush x:Key="Brush.GridText"    Color="#FF1E1E1E"/>
+    <SolidColorBrush x:Key="Brush.GridHeader"  Color="#FFE4E4E4"/>
+</ResourceDictionary>

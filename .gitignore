@@ -1,0 +1,12 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+publish/
+
+# Visual Studio / Rider
+.vs/
+.idea/
+*.user
+
+# Local test artifacts
+*.csv

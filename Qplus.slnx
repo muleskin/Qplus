@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Qplus.App/Qplus.App.csproj" />
+    <Project Path="src/Qplus.Core/Qplus.Core.csproj" />
+    <Project Path="src/Qplus.Server/Qplus.Server.csproj" />
+  </Folder>
+</Solution>

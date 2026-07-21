@@ -1,0 +1,51 @@
+<Window x:Class="Qplus.App.Views.EncryptionDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Query encryption" Height="430" Width="540"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="{DynamicResource Brush.Panel}"
+        Foreground="{DynamicResource Brush.Text}">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock x:Name="StatusHeader" FontWeight="Bold" FontSize="14"
+                   Foreground="{DynamicResource Brush.Text}"/>
+        <TextBlock Grid.Row="1" Margin="0,6,0,12" TextWrapping="Wrap" Opacity="0.85"
+                   Foreground="{DynamicResource Brush.Text}"
+                   Text="Query text is encrypted on this machine and stays encrypted on the server, so anyone with access to either database sees only ciphertext. Everyone sharing a library must use the same passphrase."/>
+
+        <TextBlock Grid.Row="2" x:Name="PassLabel" Text="Passphrase"
+                   Foreground="{DynamicResource Brush.Text}"/>
+        <PasswordBox Grid.Row="3" x:Name="PassBox" Margin="0,4,0,8" Padding="4,3"/>
+
+        <TextBlock Grid.Row="4" x:Name="ConfirmLabel" Text="Confirm passphrase"
+                   Foreground="{DynamicResource Brush.Text}"/>
+        <PasswordBox Grid.Row="5" x:Name="ConfirmBox" Margin="0,4,0,8" Padding="4,3"/>
+
+        <Border Grid.Row="6" Background="#22B8860B" BorderBrush="#66B8860B" BorderThickness="1"
+                Padding="10" Margin="0,4,0,0" CornerRadius="3">
+            <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource Brush.Text}"
+                       Text="There is no recovery. If the passphrase is lost, every encrypted query is unreadable — on every machine and on the server. Store it somewhere safe before continuing."/>
+        </Border>
+
+        <TextBlock Grid.Row="7" x:Name="StatusText" TextWrapping="Wrap" Margin="0,10,0,0"
+                   Foreground="{DynamicResource Brush.Text}"/>
+
+        <StackPanel Grid.Row="8" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+            <Button x:Name="DisableButton" Content="Turn off" Click="Disable_Click" Width="90" Margin="4,0" Padding="0,5"/>
+            <Button x:Name="PrimaryButton" Content="Enable" Click="Primary_Click" Width="110" Margin="4,0" Padding="0,5" IsDefault="True"/>
+            <Button Content="Close" Click="Cancel_Click" Width="90" Margin="4,0" Padding="0,5" IsCancel="True"/>
+        </StackPanel>
+    </Grid>
+</Window>

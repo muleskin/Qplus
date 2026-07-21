@@ -1,0 +1,143 @@
+<Window x:Class="Qplus.App.Views.EditUserDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Edit User" Height="560" Width="620"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource Brush.Panel}"
+        Foreground="{DynamicResource Brush.Text}">
+    <DockPanel Margin="10">
+
+        <!-- Buttons -->
+        <Border DockPanel.Dock="Bottom" Padding="0,10,0,0">
+            <DockPanel>
+                <TextBlock x:Name="StatusText" VerticalAlignment="Center" Opacity="0.85"
+                           TextTrimming="CharacterEllipsis"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" DockPanel.Dock="Right">
+                    <Button Content="Apply" Width="90" Margin="4,0" Padding="0,5" Click="Apply_Click"/>
+                    <Button Content="Close" Width="90" Margin="4,0" Padding="0,5" Click="Close_Click" IsCancel="True"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <TabControl x:Name="Tabs" SelectionChanged="Tabs_SelectionChanged">
+
+            <!-- ===== User ===== -->
+            <TabItem Header="User">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <Grid Margin="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="150"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="User Name" VerticalAlignment="Center" Margin="0,6"/>
+                        <TextBox   Grid.Row="0" Grid.Column="1" x:Name="UserNameBox" Margin="0,6" Padding="4,3"/>
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="New Password" VerticalAlignment="Center" Margin="0,6"/>
+                        <PasswordBox Grid.Row="1" Grid.Column="1" x:Name="PasswordBox1" Margin="0,6" Padding="4,3"/>
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Confirm Password" VerticalAlignment="Center" Margin="0,6"/>
+                        <PasswordBox Grid.Row="2" Grid.Column="1" x:Name="PasswordBox2" Margin="0,6" Padding="4,3"/>
+
+                        <CheckBox Grid.Row="3" Grid.Column="1" x:Name="ExpiredBox" Margin="0,6"
+                                  Content="Password Expired (user must change next login)"/>
+                        <CheckBox Grid.Row="4" Grid.Column="1" x:Name="ExternalBox" Margin="0,4"
+                                  Content="Operating System User"/>
+                        <CheckBox Grid.Row="5" Grid.Column="1" x:Name="LockedBox" Margin="0,4"
+                                  Content="Account is Locked"/>
+                        <CheckBox Grid.Row="6" Grid.Column="1" x:Name="EditionsBox" Margin="0,4"
+                                  Content="Edition Enabled"/>
+
+                        <Separator Grid.Row="7" Grid.ColumnSpan="2" Margin="0,10"/>
+
+                        <TextBlock Grid.Row="8" Grid.Column="0" x:Name="DefaultSpaceLabel"
+                                   Text="Default Tablespace" VerticalAlignment="Center" Margin="0,6"/>
+                        <ComboBox  Grid.Row="8" Grid.Column="1" x:Name="DefaultSpaceBox" Margin="0,6" IsEditable="True"/>
+
+                        <TextBlock Grid.Row="9" Grid.Column="0" x:Name="TempSpaceLabel"
+                                   Text="Temporary Tablespace" VerticalAlignment="Center" Margin="0,6"/>
+                        <ComboBox  Grid.Row="9" Grid.Column="1" x:Name="TempSpaceBox" Margin="0,6" IsEditable="True"/>
+                    </Grid>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ===== Granted Roles ===== -->
+            <TabItem Header="Granted Roles">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="4">
+                        <TextBlock Text="Filter:" VerticalAlignment="Center" Margin="2,0,6,0"/>
+                        <TextBox x:Name="RoleFilterBox" Width="200" Padding="4,3" TextChanged="RoleFilter_Changed"/>
+                        <Button Content="Grant all shown" Click="RolesGrantAll_Click" Margin="8,0,0,0" Padding="8,2"/>
+                        <Button Content="Revoke all shown" Click="RolesRevokeAll_Click" Margin="6,0,0,0" Padding="8,2"/>
+                    </StackPanel>
+                    <DataGrid x:Name="RolesGrid" AutoGenerateColumns="False" CanUserAddRows="False"
+                              CanUserSortColumns="True" HeadersVisibility="All">
+                        <DataGrid.Columns>
+                            <DataGridCheckBoxColumn Header="Granted" Binding="{Binding Granted, UpdateSourceTrigger=PropertyChanged}" Width="70"/>
+                            <DataGridTextColumn Header="Role" Binding="{Binding Role}" IsReadOnly="True" Width="*"/>
+                            <DataGridCheckBoxColumn Header="Admin" Binding="{Binding AdminOption, UpdateSourceTrigger=PropertyChanged}" Width="60"/>
+                            <DataGridCheckBoxColumn Header="Default" Binding="{Binding DefaultRole, UpdateSourceTrigger=PropertyChanged}" Width="65"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
+            </TabItem>
+
+            <!-- ===== System Privileges ===== -->
+            <TabItem Header="System Privileges">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="4">
+                        <TextBlock Text="Filter:" VerticalAlignment="Center" Margin="2,0,6,0"/>
+                        <TextBox x:Name="PrivFilterBox" Width="200" Padding="4,3" TextChanged="PrivFilter_Changed"/>
+                    </StackPanel>
+                    <DataGrid x:Name="PrivsGrid" AutoGenerateColumns="False" CanUserAddRows="False"
+                              CanUserSortColumns="True" HeadersVisibility="All">
+                        <DataGrid.Columns>
+                            <DataGridCheckBoxColumn Header="Granted" Binding="{Binding Granted, UpdateSourceTrigger=PropertyChanged}" Width="70"/>
+                            <DataGridTextColumn Header="Privilege" Binding="{Binding Privilege}" IsReadOnly="True" Width="*"/>
+                            <DataGridCheckBoxColumn Header="Admin" Binding="{Binding AdminOption, UpdateSourceTrigger=PropertyChanged}" Width="60"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
+            </TabItem>
+
+            <!-- ===== Quotas ===== -->
+            <TabItem Header="Quotas" x:Name="QuotasTab">
+                <DataGrid x:Name="QuotasGrid" AutoGenerateColumns="False" CanUserAddRows="False"
+                          CanUserSortColumns="True" HeadersVisibility="All">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Tablespace" Binding="{Binding Tablespace}" IsReadOnly="True" Width="*"/>
+                        <DataGridCheckBoxColumn Header="Unlimited" Binding="{Binding Unlimited, UpdateSourceTrigger=PropertyChanged}" Width="80"/>
+                        <DataGridTextColumn Header="Quota (bytes)" Binding="{Binding MaxBytes}" Width="130"/>
+                        <DataGridTextColumn Header="Used (bytes)" Binding="{Binding UsedBytes}" IsReadOnly="True" Width="130"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </TabItem>
+
+            <!-- ===== SQL ===== -->
+            <TabItem Header="SQL">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top" Margin="4"
+                               Text="Statements that will run when you press Apply. Nothing is executed until then."
+                               Opacity="0.8" TextWrapping="Wrap"/>
+                    <TextBox x:Name="SqlBox" IsReadOnly="True" AcceptsReturn="True"
+                             FontFamily="Consolas" FontSize="12"
+                             VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                             Background="{DynamicResource Brush.EditorBg}"
+                             Foreground="{DynamicResource Brush.EditorText}"/>
+                </DockPanel>
+            </TabItem>
+        </TabControl>
+    </DockPanel>
+</Window>
