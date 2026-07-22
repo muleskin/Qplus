@@ -24,6 +24,7 @@ public partial class QueryLibraryDialog : Window
         public required SavedQuery Query { get; init; }
         public string Name => Query.Name;
         public string Tags => Query.Tags;
+        public string Folder => string.IsNullOrWhiteSpace(Query.Folder) ? "—" : Query.Folder;
         public string ScopeLabel => Query.Scope.ToLabel();
         public string UpdatedLocal => Query.UpdatedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
         public required string StatusLabel { get; init; }
@@ -34,6 +35,15 @@ public partial class QueryLibraryDialog : Window
     {
         public override string ToString() => Label;
     }
+
+    /// <summary>Folder filter entry. A null folder means "all"; empty means "uncategorised".</summary>
+    private sealed record FolderChoice(string? Folder, string Label)
+    {
+        public override string ToString() => Label;
+    }
+
+    private const string AllFolders = "All folders";
+    private const string NoFolder = "(uncategorised)";
 
     private readonly CatalogStore _store;
     private readonly QuerySyncService _sync;
@@ -67,6 +77,7 @@ public partial class QueryLibraryDialog : Window
         ScopeFilter.SelectedIndex = 0;
 
         Reload();
+        RefreshFolderFilter();
     }
 
     // ================= loading =================
@@ -92,6 +103,7 @@ public partial class QueryLibraryDialog : Window
         PropsButton.IsEnabled = !ShowingDeleted;
         DuplicateButton.IsEnabled = !ShowingDeleted;
         DeleteButton.IsEnabled = !ShowingDeleted;
+        MoveButton.IsEnabled = !ShowingDeleted;
 
         UpdateStatus();
     }
@@ -101,6 +113,10 @@ public partial class QueryLibraryDialog : Window
         if (item is not Row row) return false;
 
         if (ScopeFilter.SelectedItem is ScopeChoice { Scope: { } wanted } && row.Query.Scope != wanted)
+            return false;
+
+        if (FolderFilter.SelectedItem is FolderChoice { Folder: { } f }
+            && !string.Equals(row.Query.Folder ?? "", f, StringComparison.OrdinalIgnoreCase))
             return false;
 
         var term = SearchBox.Text.Trim();
@@ -118,6 +134,46 @@ public partial class QueryLibraryDialog : Window
     }
 
     private void ShowDeleted_Changed(object sender, RoutedEventArgs e) => Reload();
+
+    /// <summary>Rebuilds the folder list, keeping the current selection where possible.</summary>
+    private void RefreshFolderFilter()
+    {
+        var previous = (FolderFilter.SelectedItem as FolderChoice)?.Folder;
+
+        var choices = new List<FolderChoice> { new(null, AllFolders), new("", NoFolder) };
+        choices.AddRange(_rows
+            .Select(r => r.Query.Folder)
+            .Where(f => !string.IsNullOrWhiteSpace(f))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
+            .Select(f => new FolderChoice(f, f)));
+
+        FolderFilter.ItemsSource = choices;
+        FolderFilter.SelectedItem = choices.FirstOrDefault(c =>
+            string.Equals(c.Folder, previous, StringComparison.OrdinalIgnoreCase)) ?? choices[0];
+    }
+
+    private void MoveToFolder_Click(object sender, RoutedEventArgs e)
+    {
+        if (ShowingDeleted) { StatusText.Text = "Restore a query before moving it."; return; }
+        if (!RequireSelection(out var rows)) return;
+
+        var dlg = new FolderPromptDialog(_store.GetFolders(), rows[0].Query.Folder) { Owner = this };
+        if (dlg.ShowDialog() != true) return;
+
+        foreach (var r in rows)
+        {
+            r.Query.Folder = dlg.Folder;
+            _store.UpsertSavedQuery(r.Query);
+        }
+
+        Changed = true;
+        Reload();
+        RefreshFolderFilter();
+        StatusText.Text = string.IsNullOrEmpty(dlg.Folder)
+            ? $"Moved {rows.Count} query(s) out of any folder."
+            : $"Moved {rows.Count} query(s) into “{dlg.Folder}”.";
+    }
 
     private void UpdateStatus()
     {
@@ -168,16 +224,19 @@ public partial class QueryLibraryDialog : Window
     {
         if (Current is not { } row) { StatusText.Text = "Select a query to edit."; return; }
 
-        var dlg = new SaveQueryDialog(row.Query.Name, row.Query.Tags, row.Query.Scope) { Owner = this };
+        var dlg = new SaveQueryDialog(row.Query.Name, row.Query.Tags, row.Query.Scope,
+            _store.GetFolders(), row.Query.Folder) { Owner = this };
         if (dlg.ShowDialog() != true) return;
 
         row.Query.Name = dlg.QueryName;
         row.Query.Tags = dlg.Tags;
         row.Query.Scope = dlg.Scope;
+        row.Query.Folder = dlg.Folder;
         _store.UpsertSavedQuery(row.Query);
 
         Changed = true;
         Reload();
+        RefreshFolderFilter();
         StatusText.Text = $"Updated '{row.Query.Name}'.";
     }
 

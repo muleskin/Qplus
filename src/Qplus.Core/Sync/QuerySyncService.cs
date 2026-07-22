@@ -219,14 +219,14 @@ public sealed class QuerySyncService
 
     internal static QueryDto ToDto(SavedQuery q) => new()
     {
-        Id = q.Id, Name = q.Name, Tags = q.Tags, Sql = q.Sql,
+        Id = q.Id, Name = q.Name, Tags = q.Tags, Folder = q.Folder, Sql = q.Sql,
         EngineScope = (int)q.Scope,
         CreatedUtc = q.CreatedUtc, UpdatedUtc = q.UpdatedUtc, IsDeleted = q.IsDeleted,
     };
 
     internal static SavedQuery FromDto(QueryDto d) => new()
     {
-        Id = d.Id, Name = d.Name, Tags = d.Tags, Sql = d.Sql,
+        Id = d.Id, Name = d.Name, Tags = d.Tags, Folder = d.Folder, Sql = d.Sql,
         Scope = (QueryEngineScope)d.EngineScope,
         CreatedUtc = d.CreatedUtc, UpdatedUtc = d.UpdatedUtc, IsDeleted = d.IsDeleted,
     };

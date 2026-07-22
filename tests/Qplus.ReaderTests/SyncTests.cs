@@ -172,6 +172,51 @@ public static class SyncTests
             Check("restore propagates to the other machine",
                 storeB.GetSavedQueries().Any(q => q.Id == mgmtId));
 
+            // ---- folders --------------------------------------------------------
+            var folderId = Guid.NewGuid().ToString("N");
+            storeA.UpsertSavedQuery(new SavedQuery
+            {
+                Id = folderId, Name = "Foldered " + folderId[..6],
+                Folder = "Reporting/Monthly", Tags = "rpt",
+                Sql = "SELECT 1", Scope = QueryEngineScope.Any,
+            });
+
+            Check("folder is stored and read back",
+                storeA.GetSavedQuery(folderId)?.Folder == "Reporting/Monthly",
+                storeA.GetSavedQuery(folderId)?.Folder ?? "n/a");
+
+            Check("folder appears in the folder list",
+                storeA.GetFolders().Contains("Reporting/Monthly"),
+                string.Join(", ", storeA.GetFolders()));
+
+            await a.SyncAsync(full: false, ct);
+            await b.SyncAsync(full: false, ct);
+            Check("folder survives the sync round trip",
+                storeB.GetSavedQuery(folderId)?.Folder == "Reporting/Monthly",
+                storeB.GetSavedQuery(folderId)?.Folder ?? "not received");
+
+            // Moving between folders must propagate like any other edit.
+            var moved = storeB.GetSavedQuery(folderId)!;
+            moved.Folder = "Archive";
+            storeB.UpsertSavedQuery(moved);
+            await b.SyncAsync(full: false, ct);
+            await a.SyncAsync(full: false, ct);
+            Check("moving to another folder propagates",
+                storeA.GetSavedQuery(folderId)?.Folder == "Archive",
+                storeA.GetSavedQuery(folderId)?.Folder ?? "n/a");
+
+            // Clearing the folder must propagate too, not be treated as "no change".
+            var cleared = storeA.GetSavedQuery(folderId)!;
+            cleared.Folder = "";
+            storeA.UpsertSavedQuery(cleared);
+            await a.SyncAsync(full: false, ct);
+            await b.SyncAsync(full: false, ct);
+            Check("clearing the folder propagates",
+                storeB.GetSavedQuery(folderId)?.Folder == "",
+                storeB.GetSavedQuery(folderId)?.Folder ?? "n/a");
+            Check("empty folder is not offered in the folder list",
+                !storeB.GetFolders().Contains(""));
+
             return _failures;
         }
         finally

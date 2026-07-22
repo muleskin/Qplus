@@ -19,6 +19,10 @@
                            Foreground="{DynamicResource Brush.Text}"/>
                 <ComboBox x:Name="ScopeFilter" Width="150" SelectionChanged="Filter_Changed"/>
 
+                <TextBlock Text="Folder:" VerticalAlignment="Center" Margin="14,0,6,0"
+                           Foreground="{DynamicResource Brush.Text}"/>
+                <ComboBox x:Name="FolderFilter" Width="170" SelectionChanged="Filter_Changed"/>
+
                 <CheckBox x:Name="ShowDeletedBox" Content="Show deleted" VerticalAlignment="Center"
                           Margin="14,0,0,0" Foreground="{DynamicResource Brush.Text}"
                           Checked="ShowDeleted_Changed" Unchecked="ShowDeleted_Changed"
@@ -46,6 +50,7 @@
                            Foreground="{DynamicResource Brush.Text}"/>
                 <Button x:Name="OpenButton" Content="Open in editor" Click="Open_Click" Margin="0,0,0,5" Padding="0,5"/>
                 <Button x:Name="PropsButton" Content="Edit properties…" Click="Properties_Click" Margin="0,0,0,5" Padding="0,5"/>
+                <Button x:Name="MoveButton" Content="Move to folder…" Click="MoveToFolder_Click" Margin="0,0,0,5" Padding="0,5"/>
                 <Button x:Name="DuplicateButton" Content="Duplicate" Click="Duplicate_Click" Margin="0,0,0,5" Padding="0,5"/>
                 <Button x:Name="DeleteButton" Content="Delete" Click="Delete_Click" Margin="0,0,0,5" Padding="0,5"/>
                 <Button x:Name="RestoreButton" Content="Restore" Click="Restore_Click" Margin="0,0,0,5" Padding="0,5"
@@ -81,7 +86,8 @@
                       SelectionChanged="Grid_SelectionChanged"
                       MouseDoubleClick="Grid_DoubleClick">
                 <DataGrid.Columns>
-                    <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="2.2*"/>
+                    <DataGridTextColumn Header="Folder" Binding="{Binding Folder}" Width="1.3*"/>
+                    <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="2*"/>
                     <DataGridTextColumn Header="Runs against" Binding="{Binding ScopeLabel}" Width="1.1*"/>
                     <DataGridTextColumn Header="Tags" Binding="{Binding Tags}" Width="1.6*"/>
                     <DataGridTextColumn Header="Updated" Binding="{Binding UpdatedLocal}" Width="1.2*"/>

@@ -10,6 +10,7 @@ public sealed class QueryDto
     public string Id { get; set; } = "";
     public string Name { get; set; } = "";
     public string Tags { get; set; } = "";
+    public string Folder { get; set; } = "";
     public string Sql { get; set; } = "";
 
     /// <summary>0 = any, 1 = SQL Server only, 2 = Oracle only.</summary>

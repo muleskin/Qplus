@@ -1,5 +1,4 @@
 using System.Windows;
-using System.Windows.Controls;
 using Qplus.Core.Models;
 
 namespace Qplus.App.Views;
@@ -11,6 +10,9 @@ public partial class SaveQueryDialog : Window
         public override string ToString() => Label;
     }
 
+    /// <summary>Shown at the top of the folder list to mean "no folder".</summary>
+    private const string NoFolder = "(none)";
+
     public string QueryName => NameBox.Text.Trim();
     public string Tags => TagsBox.Text.Trim();
 
@@ -18,6 +20,20 @@ public partial class SaveQueryDialog : Window
     public QueryEngineScope Scope =>
         (ScopeBox.SelectedItem as ScopeItem)?.Scope ?? QueryEngineScope.Any;
 
+    /// <summary>
+    /// Chosen folder, or empty for uncategorised. The combo is editable, so this is either
+    /// an existing folder the user picked or a new one they typed.
+    /// </summary>
+    public string Folder
+    {
+        get
+        {
+            var text = (FolderBox.Text ?? "").Trim().Trim('/');
+            return string.Equals(text, NoFolder, StringComparison.OrdinalIgnoreCase) ? "" : text;
+        }
+    }
+
+    /// <param name="existingFolders">Folders already in use, offered in the drop-down.</param>
     /// <param name="suggestedScope">
     /// Pre-selection — usually the active connection's engine, since a query written against
     /// one engine most often belongs to it.
@@ -25,12 +41,22 @@ public partial class SaveQueryDialog : Window
     public SaveQueryDialog(
         string suggestedName = "",
         string tags = "",
-        QueryEngineScope suggestedScope = QueryEngineScope.Any)
+        QueryEngineScope suggestedScope = QueryEngineScope.Any,
+        IEnumerable<string>? existingFolders = null,
+        string currentFolder = "")
     {
         InitializeComponent();
 
         NameBox.Text = suggestedName;
         TagsBox.Text = tags;
+
+        var folders = new List<string> { NoFolder };
+        folders.AddRange((existingFolders ?? Enumerable.Empty<string>())
+            .Where(f => !string.IsNullOrWhiteSpace(f))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(f => f, StringComparer.OrdinalIgnoreCase));
+        FolderBox.ItemsSource = folders;
+        FolderBox.Text = string.IsNullOrWhiteSpace(currentFolder) ? "" : currentFolder;
 
         var items = new[]
         {

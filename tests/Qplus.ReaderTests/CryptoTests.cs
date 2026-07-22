@@ -91,7 +91,7 @@ public static class CryptoTests
             store.UpsertSavedQuery(new SavedQuery
             {
                 Id = id, Name = "Confidential model", Tags = "ip secret",
-                Sql = secret, Scope = QueryEngineScope.OracleOnly,
+                Folder = "SecretProject", Sql = secret, Scope = QueryEngineScope.OracleOnly,
             });
 
             var readBack = store.GetSavedQuery(id);
@@ -100,7 +100,11 @@ public static class CryptoTests
             // The bytes on disk must not contain the plaintext.
             var text = ReadDatabaseText(dbPath);
             Check("local database file holds no plaintext",
-                !text.Contains("proprietary_calc") && !text.Contains("Confidential model"));
+                !text.Contains("proprietary_calc") && !text.Contains("Confidential model")
+                && !text.Contains("SecretProject"));
+            Check("folder round-trips through encryption",
+                store.GetSavedQuery(id)?.Folder == "SecretProject",
+                store.GetSavedQuery(id)?.Folder ?? "n/a");
 
             // A locked catalog must not leak, and must not throw.
             store.ProtectionKeys = null;
@@ -142,6 +146,8 @@ public static class CryptoTests
                     !serverText.Contains("proprietary_calc"));
                 Check("server database holds no plaintext query name",
                     !serverText.Contains("Confidential model"));
+                Check("server database holds no plaintext folder name",
+                    !serverText.Contains("SecretProject"));
                 Check("server database does hold ciphertext",
                     serverText.Contains(QueryCipher.Prefix));
 

@@ -316,7 +316,12 @@ public partial class MainWindow : Window, IShell
         var suggested = existing?.Scope
             ?? (doc.Connection is { } c ? QueryEngineScopeExtensions.FromEngine(c.Engine) : QueryEngineScope.Any);
 
-        var dlg = new SaveQueryDialog(existing?.Name ?? doc.Title, existing?.Tags ?? "", suggested) { Owner = this };
+        var dlg = new SaveQueryDialog(
+            existing?.Name ?? doc.Title,
+            existing?.Tags ?? "",
+            suggested,
+            _store.GetFolders(),
+            existing?.Folder ?? "") { Owner = this };
         if (dlg.ShowDialog() != true) return;
 
         var match = _savedQueries.FirstOrDefault(q =>
@@ -326,6 +331,7 @@ public partial class MainWindow : Window, IShell
         query.Tags = dlg.Tags;
         query.Sql = doc.EditorText;
         query.Scope = dlg.Scope;
+        query.Folder = dlg.Folder;
 
         _store.UpsertSavedQuery(query);
         LoadSavedQueries();

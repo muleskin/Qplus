@@ -8,6 +8,7 @@ public sealed class QueryDto
     public string Id { get; set; } = "";
     public string Name { get; set; } = "";
     public string Tags { get; set; } = "";
+    public string Folder { get; set; } = "";
     public string Sql { get; set; } = "";
     public int EngineScope { get; set; }
     public DateTime CreatedUtc { get; set; }
@@ -73,6 +74,7 @@ CREATE TABLE IF NOT EXISTS queries (
     id           TEXT PRIMARY KEY,
     name         TEXT NOT NULL,
     tags         TEXT NOT NULL DEFAULT '',
+    folder       TEXT NOT NULL DEFAULT '',
     sql          TEXT NOT NULL,
     engine_scope INTEGER NOT NULL DEFAULT 0,
     created_utc  TEXT NOT NULL,
@@ -83,7 +85,21 @@ CREATE TABLE IF NOT EXISTS queries (
 CREATE INDEX IF NOT EXISTS ix_queries_rev ON queries(rev);";
         cmd.ExecuteNonQuery();
 
-        // Defensive migration for a store created before revisions existed.
+        // Defensive migrations for stores created before these columns existed.
+        var existing = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        using (var info0 = c.CreateCommand())
+        {
+            info0.CommandText = "PRAGMA table_info(queries);";
+            using var r0 = info0.ExecuteReader();
+            while (r0.Read()) existing.Add(r0.GetString(1));
+        }
+        if (!existing.Contains("folder"))
+        {
+            using var alterF = c.CreateCommand();
+            alterF.CommandText = "ALTER TABLE queries ADD COLUMN folder TEXT NOT NULL DEFAULT '';";
+            alterF.ExecuteNonQuery();
+        }
+
         var hasRev = false;
         using (var info = c.CreateCommand())
         {
@@ -142,14 +158,15 @@ CREATE INDEX IF NOT EXISTS ix_queries_rev ON queries(rev);";
                 using var cmd = c.CreateCommand();
                 cmd.Transaction = tx;
                 cmd.CommandText = @"
-INSERT INTO queries (id,name,tags,sql,engine_scope,created_utc,updated_utc,is_deleted,rev)
-VALUES ($id,$name,$tags,$sql,$scope,$created,$updated,$deleted,$rev)
+INSERT INTO queries (id,name,tags,folder,sql,engine_scope,created_utc,updated_utc,is_deleted,rev)
+VALUES ($id,$name,$tags,$folder,$sql,$scope,$created,$updated,$deleted,$rev)
 ON CONFLICT(id) DO UPDATE SET
-  name=$name, tags=$tags, sql=$sql, engine_scope=$scope,
+  name=$name, tags=$tags, folder=$folder, sql=$sql, engine_scope=$scope,
   updated_utc=$updated, is_deleted=$deleted, rev=$rev;";
                 Bind(cmd, "$id", q.Id);
                 Bind(cmd, "$name", q.Name ?? "");
                 Bind(cmd, "$tags", q.Tags ?? "");
+                Bind(cmd, "$folder", q.Folder ?? "");
                 Bind(cmd, "$sql", q.Sql ?? "");
                 Bind(cmd, "$scope", q.EngineScope);
                 Bind(cmd, "$created", Iso(q.CreatedUtc));
@@ -200,6 +217,7 @@ ON CONFLICT(id) DO UPDATE SET
                 Id = r.GetString(r.GetOrdinal("id")),
                 Name = r.GetString(r.GetOrdinal("name")),
                 Tags = r.GetString(r.GetOrdinal("tags")),
+                Folder = r.GetString(r.GetOrdinal("folder")),
                 Sql = r.GetString(r.GetOrdinal("sql")),
                 EngineScope = r.GetInt32(r.GetOrdinal("engine_scope")),
                 CreatedUtc = ParseUtc(r.GetString(r.GetOrdinal("created_utc"))),

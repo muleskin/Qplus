@@ -109,6 +109,9 @@ CREATE TABLE IF NOT EXISTS settings (
 
         if (!columns.Contains("is_deleted"))
             Exec("ALTER TABLE saved_queries ADD COLUMN is_deleted INTEGER NOT NULL DEFAULT 0;");
+
+        if (!columns.Contains("folder"))
+            Exec("ALTER TABLE saved_queries ADD COLUMN folder TEXT NOT NULL DEFAULT '';");
     }
 
     // ---- Connections ---------------------------------------------------------
@@ -233,9 +236,11 @@ ON CONFLICT(id) DO UPDATE SET
             var name = r.GetString(r.GetOrdinal("name"));
             var tags = r.GetString(r.GetOrdinal("tags"));
             var sql = r.GetString(r.GetOrdinal("sql"));
+            var folder = r.GetString(r.GetOrdinal("folder"));
 
             if (decrypt)
             {
+                folder = QueryCipher.DecryptOrPlaceholder(folder, ProtectionKeys, "");
                 // Locked or wrong-key rows degrade to a placeholder rather than throwing,
                 // so the library still lists and the user can be prompted to unlock.
                 name = QueryCipher.DecryptOrPlaceholder(name, ProtectionKeys);
@@ -249,6 +254,7 @@ ON CONFLICT(id) DO UPDATE SET
                 Id = r.GetString(r.GetOrdinal("id")),
                 Name = name,
                 Tags = tags,
+                Folder = folder,
                 Sql = sql,
                 Scope = (QueryEngineScope)r.GetInt32(r.GetOrdinal("engine_scope")),
                 CreatedUtc = DateTime.Parse(r.GetString(r.GetOrdinal("created_utc")),
@@ -264,6 +270,19 @@ ON CONFLICT(id) DO UPDATE SET
 
         return list;
     }
+
+    /// <summary>
+    /// Distinct folders currently in use, for the pickers. Derived from the queries
+    /// themselves rather than a separate table, so a folder exists exactly as long as
+    /// something is filed in it.
+    /// </summary>
+    public List<string> GetFolders() =>
+        GetSavedQueries()
+            .Select(q => q.Folder)
+            .Where(f => !string.IsNullOrWhiteSpace(f))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
     /// <summary>Saves a user edit, stamping UpdatedUtc to now and encrypting if enabled.</summary>
     public void UpsertSavedQuery(SavedQuery q)
@@ -284,25 +303,28 @@ ON CONFLICT(id) DO UPDATE SET
         var name = q.Name;
         var tags = q.Tags;
         var sql = q.Sql;
+        var folder = q.Folder;
 
         if (protect && ProtectionKeys is { } keys)
         {
             name = QueryCipher.Encrypt(name, keys);
             tags = QueryCipher.Encrypt(tags, keys);
             sql = QueryCipher.Encrypt(sql, keys);
+            folder = QueryCipher.Encrypt(folder, keys);
         }
 
         using var c = Open();
         using var cmd = c.CreateCommand();
         cmd.CommandText = @"
-INSERT INTO saved_queries (id,name,tags,sql,engine_scope,created_utc,updated_utc,is_deleted)
-VALUES ($id,$name,$tags,$sql,$scope,$created,$updated,$deleted)
+INSERT INTO saved_queries (id,name,tags,folder,sql,engine_scope,created_utc,updated_utc,is_deleted)
+VALUES ($id,$name,$tags,$folder,$sql,$scope,$created,$updated,$deleted)
 ON CONFLICT(id) DO UPDATE SET
-  name=$name, tags=$tags, sql=$sql, engine_scope=$scope,
+  name=$name, tags=$tags, folder=$folder, sql=$sql, engine_scope=$scope,
   updated_utc=$updated, is_deleted=$deleted;";
         Bind(cmd, "$id", q.Id);
         Bind(cmd, "$name", name);
         Bind(cmd, "$tags", tags);
+        Bind(cmd, "$folder", folder);
         Bind(cmd, "$sql", sql);
         Bind(cmd, "$scope", (int)q.Scope);
         Bind(cmd, "$created", q.CreatedUtc.ToString("o"));
@@ -337,6 +359,7 @@ ON CONFLICT(id) DO UPDATE SET
                 {
                     q.Name = QueryCipher.Decrypt(q.Name, oldKeys);
                     q.Tags = QueryCipher.Decrypt(q.Tags, oldKeys);
+                    q.Folder = QueryCipher.Decrypt(q.Folder, oldKeys);
                     q.Sql = QueryCipher.Decrypt(q.Sql, oldKeys);
                 }
 
