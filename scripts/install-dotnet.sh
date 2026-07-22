@@ -1,16 +1,18 @@
 #!/usr/bin/env bash
 #
-# Install the .NET SDK needed to build Qplus on Linux.
+# Install a .NET SDK capable of building Qplus on Linux.
 #
-# The version is read from global.json so this script can never drift from the pin.
-# That pin is currently a preview build; preview builds are eventually removed from the
-# CDN, so if the exact version is gone we fall back to the newest SDK that still
-# satisfies global.json (rollForward: latestMinor accepts any newer .NET 10 SDK).
+# Whether an SDK is acceptable is decided by asking dotnet itself — `dotnet --version`
+# run from the repository root succeeds only if some installed SDK satisfies global.json.
+# That is the authoritative check; guessing from version numbers is not, because
+# roll-forward only ever moves *forward*: an SDK older than the pinned version can never
+# satisfy it, however new its major version looks.
 #
 #   ./scripts/install-dotnet.sh                 install system-wide (needs root) or to ~/.dotnet
 #   sudo ./scripts/install-dotnet.sh --verify   install, then build the server to prove it works
 #   ./scripts/install-dotnet.sh --user          force a per-user install
 #   ./scripts/install-dotnet.sh --version 10.0.100
+#   ./scripts/install-dotnet.sh --channel 8.0
 #
 set -euo pipefail
 
@@ -24,6 +26,9 @@ INSTALLER_URL="https://dot.net/v1/dotnet-install.sh"
 SYSTEM_DIR="/usr/local/share/dotnet"
 USER_DIR="$HOME/.dotnet"
 PROFILE_D="/etc/profile.d/dotnet.sh"
+
+# Channel used when global.json names no usable version.
+DEFAULT_CHANNEL="8.0"
 
 VERSION=""          # --version
 CHANNEL=""          # --channel
@@ -57,7 +62,7 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-# ---------------------------------------------------------------- pinned version
+# ---------------------------------------------------------------- what does the repo ask for?
 
 read_pinned_version() {
     [ -f "$GLOBAL_JSON" ] || return 1
@@ -65,18 +70,36 @@ read_pinned_version() {
     sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$GLOBAL_JSON" | head -1
 }
 
-if [ -z "$VERSION" ] && [ -z "$CHANNEL" ]; then
-    VERSION="$(read_pinned_version || true)"
-    if [ -n "$VERSION" ]; then
-        say "global.json pins SDK $VERSION"
-    else
-        warn "could not read a version from $GLOBAL_JSON — falling back to channel 10.0"
-        CHANNEL="10.0"
-    fi
-fi
+PINNED="$(read_pinned_version || true)"
+[ -n "$PINNED" ] && say "global.json asks for SDK $PINNED (plus whatever rollForward allows)"
 
-# Major version the repo needs, used for the "already installed?" check below.
-MAJOR="${VERSION%%.*}"; [ -n "$MAJOR" ] || MAJOR="${CHANNEL%%.*}"; [ -n "$MAJOR" ] || MAJOR=10
+# The version we will try to install, if we need to install anything at all.
+WANTED="${VERSION:-$PINNED}"
+
+# ---------------------------------------------------------------- is one already good enough?
+
+# Authoritative: dotnet resolves global.json itself.
+satisfies_global_json() {
+    local dotnet="$1"
+    [ -x "$dotnet" ] || command -v "$dotnet" >/dev/null 2>&1 || return 1
+    ( cd "$REPO_ROOT" && "$dotnet" --version >/dev/null 2>&1 )
+}
+
+DOTNET=""
+for candidate in "$(command -v dotnet 2>/dev/null || true)" "$SYSTEM_DIR/dotnet" "$USER_DIR/dotnet"; do
+    [ -n "$candidate" ] || continue
+    if satisfies_global_json "$candidate"; then
+        DOTNET="$candidate"
+        say "an installed SDK already satisfies global.json:"
+        ( cd "$REPO_ROOT" && "$DOTNET" --version | sed 's/^/    /' )
+        break
+    fi
+done
+
+if [ -n "$DOTNET" ] && [ "$DO_VERIFY" -eq 0 ] && [ -z "$VERSION" ]; then
+    say "nothing to install (pass --verify to build the server as a check)"
+    exit 0
+fi
 
 # ---------------------------------------------------------------- scope
 
@@ -90,30 +113,6 @@ if [ "$SCOPE" = system ]; then
 else
     INSTALL_DIR="$USER_DIR"
 fi
-
-say "installing to $INSTALL_DIR ($SCOPE)"
-
-# ---------------------------------------------------------------- already there?
-
-sdk_present() {
-    local dotnet="$1"
-    [ -x "$dotnet" ] || return 1
-    "$dotnet" --list-sdks 2>/dev/null | grep -q "^${MAJOR}\." || return 1
-    return 0
-}
-
-for candidate in "$INSTALL_DIR/dotnet" "$(command -v dotnet 2>/dev/null || true)"; do
-    if [ -n "$candidate" ] && sdk_present "$candidate"; then
-        say "a .NET $MAJOR SDK is already installed:"
-        "$candidate" --list-sdks | sed 's/^/    /'
-        if [ "$DO_VERIFY" -eq 0 ]; then
-            say "nothing to do (pass --verify to build the server as a check)"
-            exit 0
-        fi
-        DOTNET="$candidate"
-        break
-    fi
-done
 
 # ---------------------------------------------------------------- prerequisites
 
@@ -150,7 +149,8 @@ install_prereqs() {
 
 # ---------------------------------------------------------------- install
 
-if [ -z "${DOTNET:-}" ]; then
+if [ -z "$DOTNET" ] || [ -n "$VERSION" ]; then
+    say "installing to $INSTALL_DIR ($SCOPE)"
     install_prereqs
 
     command -v curl >/dev/null 2>&1 || command -v wget >/dev/null 2>&1 \
@@ -169,56 +169,49 @@ if [ -z "${DOTNET:-}" ]; then
     [ -s "$INSTALLER" ] || die "downloaded installer is empty"
     chmod +x "$INSTALLER"
 
-    install_attempt() {
-        # shellcheck disable=SC2086
-        "$INSTALLER" --install-dir "$INSTALL_DIR" --no-path "$@"
-    }
+    attempt() { "$INSTALLER" --install-dir "$INSTALL_DIR" --no-path "$@"; }
 
     installed=0
-    if [ -n "$VERSION" ]; then
-        say "installing SDK $VERSION"
-        if install_attempt --version "$VERSION"; then
+    if [ -n "$WANTED" ]; then
+        say "installing SDK $WANTED"
+        if attempt --version "$WANTED"; then
             installed=1
         else
-            warn "SDK $VERSION is not available on the CDN (preview builds get retired)"
+            warn "SDK $WANTED is not available (preview builds are eventually retired)"
         fi
     fi
 
     if [ "$installed" -eq 0 ]; then
-        # global.json uses rollForward: latestMinor, so any newer .NET $MAJOR SDK satisfies it.
-        fallback_channel="${CHANNEL:-$MAJOR.0}"
-        say "falling back to the newest SDK on channel $fallback_channel"
-        if install_attempt --channel "$fallback_channel" --quality preview; then
-            installed=1
-        elif install_attempt --channel "$fallback_channel"; then
-            installed=1
-        fi
+        fallback="${CHANNEL:-${WANTED%%.*}.0}"
+        [ "$fallback" = ".0" ] && fallback="$DEFAULT_CHANNEL"
+        say "installing the newest SDK on channel $fallback instead"
+        attempt --channel "$fallback" --quality preview || attempt --channel "$fallback" || true
+        # Last resort: whatever the default channel offers.
+        [ -x "$INSTALL_DIR/dotnet" ] || attempt --channel "$DEFAULT_CHANNEL" || true
     fi
 
-    [ "$installed" -eq 1 ] || die "could not install a .NET $MAJOR SDK"
+    [ -x "$INSTALL_DIR/dotnet" ] || die "could not install a .NET SDK"
     DOTNET="$INSTALL_DIR/dotnet"
-fi
 
-# ---------------------------------------------------------------- PATH
-
-if [ "$SCOPE" = system ]; then
-    say "adding $INSTALL_DIR to PATH for all users ($PROFILE_D)"
-    cat > "$PROFILE_D" <<EOF
+    # ---------------------------------------------------------------- PATH
+    if [ "$SCOPE" = system ]; then
+        say "adding $INSTALL_DIR to PATH for all users ($PROFILE_D)"
+        cat > "$PROFILE_D" <<EOF
 # Added by Qplus scripts/install-dotnet.sh
 export DOTNET_ROOT=$INSTALL_DIR
 export PATH="\$PATH:$INSTALL_DIR:$INSTALL_DIR/tools"
 export DOTNET_CLI_TELEMETRY_OPTOUT=1
 EOF
-    chmod 0644 "$PROFILE_D"
-    ln -sf "$INSTALL_DIR/dotnet" /usr/local/bin/dotnet
-    say "linked /usr/local/bin/dotnet"
-else
-    say "add this to your shell profile:"
-    printf '\n    export DOTNET_ROOT=%s\n    export PATH="$PATH:%s"\n\n' "$INSTALL_DIR" "$INSTALL_DIR"
+        chmod 0644 "$PROFILE_D"
+        ln -sf "$INSTALL_DIR/dotnet" /usr/local/bin/dotnet
+        say "linked /usr/local/bin/dotnet"
+    else
+        say "add this to your shell profile:"
+        printf '\n    export DOTNET_ROOT=%s\n    export PATH="$PATH:%s"\n\n' "$INSTALL_DIR" "$INSTALL_DIR"
+    fi
 fi
 
-export DOTNET_ROOT="$INSTALL_DIR"
-export PATH="$PATH:$INSTALL_DIR"
+export DOTNET_ROOT="${DOTNET_ROOT:-$(dirname "$DOTNET")}"
 export DOTNET_CLI_TELEMETRY_OPTOUT=1
 
 # ---------------------------------------------------------------- verify
@@ -226,7 +219,14 @@ export DOTNET_CLI_TELEMETRY_OPTOUT=1
 say "installed SDKs:"
 "$DOTNET" --list-sdks | sed 's/^/    /'
 
-say "global.json resolves to: $("$DOTNET" --version 2>/dev/null || echo '(global.json not satisfied)')"
+if satisfies_global_json "$DOTNET"; then
+    say "global.json resolves to $( cd "$REPO_ROOT" && "$DOTNET" --version )"
+else
+    warn "no installed SDK satisfies $GLOBAL_JSON"
+    warn "roll-forward never selects an SDK older than the pinned version, so installing a"
+    warn "lower version will not help. Either install the pinned SDK, or relax global.json."
+    exit 1
+fi
 
 if [ "$DO_VERIFY" -eq 1 ]; then
     say "building the query server as a check"
