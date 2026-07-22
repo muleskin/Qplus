@@ -36,13 +36,16 @@ PUBLISH_FLAGS := -c $(CONFIG) -r $(RID) --self-contained true \
 	-p:IncludeNativeLibrariesForSelfExtract=true \
 	-p:EnableCompressionInSingleFile=true
 
-.PHONY: help build publish run clean install uninstall service \
+.PHONY: help sdk build publish run clean install uninstall service \
         start stop restart status logs enable disable backup check-root
 
 ## ---------------------------------------------------------------- help
 
 help:
 	@echo "Qplus query server"
+	@echo
+	@echo "Prerequisites"
+	@echo "  sdk         install the .NET SDK pinned in global.json"
 	@echo
 	@echo "Build"
 	@echo "  build       compile ($(CONFIG))"
@@ -61,6 +64,13 @@ help:
 	@echo
 	@echo "Settings: PORT=$(PORT) HOST=$(HOST) DB=$(DB) RUN_USER=$(RUN_USER)"
 	@echo "Set API_KEY=... on install, or the server accepts anyone who can reach it."
+
+## ---------------------------------------------------------------- sdk
+
+# Installs the SDK version pinned in global.json (falls back to the newest .NET 10
+# SDK if that preview build has been retired from the CDN).
+sdk:
+	@../../scripts/install-dotnet.sh $(if $(API_KEY),,)
 
 ## ---------------------------------------------------------------- build
 

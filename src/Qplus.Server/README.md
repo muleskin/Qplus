@@ -11,6 +11,7 @@ It is a small ASP.NET Core service with a SQLite file behind it. It holds only q
 A `Makefile` automates everything below. Run `make` on its own to list the targets.
 
 ```bash
+make sdk                # install the .NET SDK pinned in global.json (first time only)
 make publish            # single self-contained binary -> ./out/Qplus.Server
 sudo make service       # install to /opt/qplus, write the unit, enable and start
 make status             # unit state plus a health check

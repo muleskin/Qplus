@@ -75,6 +75,8 @@ Optional. It keeps the saved-query library in step across machines and stores **
 only** — no credentials or connection details ever leave the client.
 
 ```bash
+sudo ./scripts/install-dotnet.sh   # .NET SDK pinned in global.json (first time only)
+
 cd src/Qplus.Server
 make publish      # single self-contained linux-x64 binary in ./out
 sudo make install # /opt/qplus + systemd unit + /var/lib/qplus
