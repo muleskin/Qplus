@@ -2,6 +2,7 @@
 [Bb]in/
 [Oo]bj/
 publish/
+out/
 
 # Visual Studio / Rider
 .vs/
