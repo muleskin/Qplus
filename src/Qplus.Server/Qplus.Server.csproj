@@ -7,7 +7,7 @@
     <RootNamespace>Qplus.Server</RootNamespace>
     <!-- No database-driver dependencies here: the server only stores text. -->
     <InvariantGlobalization>true</InvariantGlobalization>
-    <Version>0.3.0</Version>
+    <Version>0.4.0</Version>
   </PropertyGroup>
 
   <ItemGroup>

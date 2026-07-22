@@ -26,6 +26,12 @@ builder.Services.AddSingleton(store);
 
 var app = builder.Build();
 
+// Reported by /health. Taken from the assembly so it cannot drift from the build.
+var serverVersion = (System.Reflection.CustomAttributeExtensions.GetCustomAttribute<
+        System.Reflection.AssemblyInformationalVersionAttribute>(
+            System.Reflection.Assembly.GetExecutingAssembly())?.InformationalVersion
+    ?? "unknown").Split('+')[0];
+
 var log = app.Logger;
 log.LogInformation("Qplus query server starting. Database: {Db}", dbPath);
 if (string.IsNullOrWhiteSpace(apiKey))
@@ -48,7 +54,7 @@ app.MapGet("/api/v1/health", (HttpRequest req) =>
     return Results.Ok(new
     {
         service = "qplus-query-server",
-        version = "0.3.0",
+        version = serverVersion,
         queries = store.Count(),
         serverTimeUtc = DateTime.UtcNow,
     });

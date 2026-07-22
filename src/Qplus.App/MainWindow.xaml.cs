@@ -477,9 +477,19 @@ public partial class MainWindow : Window, IShell
             File.WriteAllText(dlg.FileName, doc.EditorText);
     }
 
+    /// <summary>
+    /// Read from the assembly rather than written out here — a hard-coded string in this
+    /// dialog had already drifted a version behind the build.
+    /// </summary>
+    private static string AppVersion =>
+        (System.Reflection.CustomAttributeExtensions.GetCustomAttribute<
+             System.Reflection.AssemblyInformationalVersionAttribute>(
+                 System.Reflection.Assembly.GetExecutingAssembly())?.InformationalVersion
+         ?? "unknown").Split('+')[0];
+
     private void About_Click(object sender, RoutedEventArgs e)
         => MessageBox.Show(this,
-            "Qplus 0.2.0\nA lightweight SQL Server + Oracle client.\n\n" +
+            $"Qplus {AppVersion}\nA lightweight SQL Server + Oracle client.\n\n" +
             "Connections and the saved-query library live in a local SQLite catalog under %AppData%\\Qplus.",
             "About Qplus", MessageBoxButton.OK, MessageBoxImage.Information);
 

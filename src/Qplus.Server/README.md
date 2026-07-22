@@ -147,7 +147,7 @@ docker run -d --name qplus -p 5080:5080 \
 ### `GET /api/v1/health`
 
 ```json
-{ "service": "qplus-query-server", "version": "0.3.0", "queries": 42,
+{ "service": "qplus-query-server", "version": "0.4.0", "queries": 42,
   "serverTimeUtc": "2026-07-21T15:18:10Z" }
 ```
 

@@ -10,7 +10,7 @@
     <AssemblyName>Qplus</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets/qplus.ico</ApplicationIcon>
-    <Version>0.3.0</Version>
+    <Version>0.4.0</Version>
     <!-- Publish single-file output to <repo root>/publish instead of the deep bin path. -->
     <PublishDir>$(MSBuildThisFileDirectory)..\..\publish\</PublishDir>
   </PropertyGroup>
