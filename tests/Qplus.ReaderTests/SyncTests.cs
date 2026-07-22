@@ -138,6 +138,40 @@ public static class SyncTests
             Check("tombstones are not shown as live queries on the new machine",
                 storeC.GetSavedQueries().All(q => q.Id != id));
 
+            // ---- library management: tombstones, restore, status ---------------
+            var mgmtId = Guid.NewGuid().ToString("N");
+            storeA.UpsertSavedQuery(new SavedQuery
+            {
+                Id = mgmtId, Name = "Managed " + mgmtId[..6], Tags = "mgmt",
+                Sql = "SELECT 1", Scope = QueryEngineScope.Any,
+            });
+
+            Check("new query reports as not yet synced",
+                SavedQueryStatus.For(storeA.GetSavedQuery(mgmtId)!, a.LastSyncUtc)
+                    == SavedQuerySyncState.PendingUpload);
+
+            await a.SyncAsync(full: false, ct);
+            Check("after syncing it reports as synced",
+                SavedQueryStatus.For(storeA.GetSavedQuery(mgmtId)!, a.LastSyncUtc)
+                    == SavedQuerySyncState.Synced);
+
+            storeA.DeleteSavedQuery(mgmtId);
+            Check("deleted query appears in the deleted list",
+                storeA.GetDeletedSavedQueries().Any(q => q.Id == mgmtId));
+            Check("deleted query is out of the live list",
+                storeA.GetSavedQueries().All(q => q.Id != mgmtId));
+
+            Check("restore brings it back",
+                storeA.RestoreSavedQuery(mgmtId)
+                && storeA.GetSavedQueries().Any(q => q.Id == mgmtId));
+            Check("restoring twice is a no-op", !storeA.RestoreSavedQuery(mgmtId));
+
+            // A restore must win over the deletion on the other machine.
+            await a.SyncAsync(full: false, ct);
+            await b.SyncAsync(full: false, ct);
+            Check("restore propagates to the other machine",
+                storeB.GetSavedQueries().Any(q => q.Id == mgmtId));
+
             return _failures;
         }
         finally

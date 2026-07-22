@@ -383,6 +383,18 @@ public partial class MainWindow : Window, IShell
         }
     }
 
+    private void QueryLibrary_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new QueryLibraryDialog(_store, Sync) { Owner = this };
+        var opened = dlg.ShowDialog();
+
+        if (dlg.Changed) LoadSavedQueries();
+
+        // The dialog closes with a query chosen to open.
+        if (opened == true && dlg.SqlToOpen is { } sql)
+            NewDocument(dlg.TitleToOpen, sql, ActiveDoc?.Connection);
+    }
+
     private void Encryption_Click(object sender, RoutedEventArgs e)
     {
         var dlg = new EncryptionDialog(_store, _keyRing) { Owner = this };

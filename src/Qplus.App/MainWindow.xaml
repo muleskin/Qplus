@@ -32,6 +32,7 @@
                 <MenuItem Header="_Cancel" Click="CancelQuery_Click"/>
                 <Separator/>
                 <MenuItem Header="_Save query to library…" Click="SaveQuery_Click"/>
+                <MenuItem Header="Query _library…" Click="QueryLibrary_Click"/>
                 <Separator/>
                 <MenuItem Header="S_ync queries with server" Click="SyncQueries_Click"/>
                 <MenuItem Header="_Full sync (exchange everything)" Click="SyncQueriesFull_Click"/>
@@ -72,6 +73,8 @@
                         ToolTip="Save the active tab's SQL to the query library"/>
                 <Button Content="Delete" Click="DeleteSavedQuery_Click" Padding="6,2"
                         ToolTip="Delete the selected saved query"/>
+                <Button Content="Library…" Click="QueryLibrary_Click" Padding="6,2"
+                        ToolTip="Manage the saved-query library: search, retag, delete, restore, import and export"/>
                 <Button x:Name="SyncButton" Content="⟲ Sync" Click="SyncQueries_Click" Padding="6,2" Margin="6,0,0,0"
                         ToolTip="Two-way sync of the saved-query library with the central server"/>
             </ToolBar>

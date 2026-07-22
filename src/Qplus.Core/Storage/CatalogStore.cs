@@ -353,6 +353,28 @@ ON CONFLICT(id) DO UPDATE SET
         return changed;
     }
 
+    /// <summary>
+    /// Tombstoned queries — deleted here or on another machine, but still recoverable
+    /// because the row is kept so the deletion can propagate.
+    /// </summary>
+    public List<SavedQuery> GetDeletedSavedQueries() => ReadQueries("WHERE is_deleted = 1", decrypt: true);
+
+    /// <summary>
+    /// Brings a tombstoned query back. UpdatedUtc is bumped so the restoration wins over the
+    /// deletion on every other machine at the next sync — otherwise they would delete it again.
+    /// </summary>
+    public bool RestoreSavedQuery(string id)
+    {
+        using var c = Open();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = @"UPDATE saved_queries
+                            SET is_deleted = 0, updated_utc = $now
+                            WHERE id = $id AND is_deleted = 1;";
+        Bind(cmd, "$now", DateTime.UtcNow.ToString("o"));
+        Bind(cmd, "$id", id);
+        return cmd.ExecuteNonQuery() > 0;
+    }
+
     /// <summary>Soft-deletes so the removal can propagate to other machines during sync.</summary>
     public void DeleteSavedQuery(string id)
     {
