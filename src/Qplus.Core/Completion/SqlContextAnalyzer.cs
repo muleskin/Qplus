@@ -55,6 +55,39 @@ public static class SqlContextAnalyzer
         @"(?:\s+(?:AS\s+)?(?<alias>\[[^\]]+\]|""[^""]+""|[A-Za-z_][\w$#]*))?",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+    /// <summary>
+    /// True when the caret sits just after a keyword (or a comma) that should open the
+    /// suggestion list, e.g. "… WHERE |" or "SELECT a, |".
+    ///
+    /// Typing a letter is not enough on its own: while you are still typing WHERE, the
+    /// nearest preceding keyword is FROM, so the list would offer tables and never update
+    /// once the keyword is finished. Whitespace after a keyword is the real trigger point.
+    /// </summary>
+    public static bool IsAfterTriggerKeyword(string text, int caret)
+    {
+        if (string.IsNullOrEmpty(text)) return false;
+        caret = Math.Clamp(caret, 0, text.Length);
+
+        var safe = Blank(text);
+
+        // Require at least one space/tab immediately before the caret.
+        var i = caret;
+        var sawSpace = false;
+        while (i > 0 && (safe[i - 1] == ' ' || safe[i - 1] == '\t')) { i--; sawSpace = true; }
+        if (!sawSpace) return false;
+        if (i == 0) return false;
+
+        // A comma opens the list too — "SELECT a, " wants columns.
+        if (safe[i - 1] == ',') return true;
+
+        var end = i;
+        while (i > 0 && IsIdentChar(safe[i - 1])) i--;
+        if (i == end) return false;
+
+        var word = safe[i..end];
+        return TableKeywords.Contains(word) || ColumnKeywords.Contains(word);
+    }
+
     public static SqlCompletionContext Analyze(string text, int caret)
     {
         if (string.IsNullOrEmpty(text)) return SqlCompletionContext.None;

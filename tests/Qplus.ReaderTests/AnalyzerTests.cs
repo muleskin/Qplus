@@ -100,6 +100,37 @@ public static class AnalyzerTests
             c.Tables.Count == 1 && c.Tables[0].Schema == "dbo" && c.Tables[0].Name == "cd well",
             c.Tables.Count == 1 ? $"{c.Tables[0].Schema}.{c.Tables[0].Name}" : "none");
 
+        // ---- trigger points -------------------------------------------------
+        // Reported case: typing "where" then space produced nothing, because the popup
+        // only opened on letters and by then the nearest keyword was still FROM.
+        bool Trig(string marked)
+        {
+            var caret = marked.IndexOf('|');
+            return SqlContextAnalyzer.IsAfterTriggerKeyword(marked.Remove(caret, 1), caret);
+        }
+
+        Check("space after WHERE triggers", Trig("select * from CD_WELL_SOURCE where |"));
+        Check("space after FROM triggers", Trig("select * from |"));
+        Check("space after JOIN triggers", Trig("select * from a join |"));
+        Check("space after AND triggers", Trig("select * from t where x = 1 and |"));
+        Check("space after SELECT triggers", Trig("select |"));
+        Check("comma triggers", Trig("select a, |"));
+        Check("mid-keyword does not trigger", !Trig("select * from t whe|"));
+        Check("no whitespace does not trigger", !Trig("select * from t where|"));
+        Check("after a value does not trigger", !Trig("select * from t where x = 5 |"));
+        Check("after a table name does not trigger", !Trig("select * from CD_WELL_SOURCE |"));
+        // A keyword inside a string literal must not itself be the trigger word. (In
+        // "select 'where ' |" the trigger is the real SELECT, which is correct — so pick a
+        // case where the only keyword present is the quoted one.)
+        Check("keyword inside a string is not the trigger", !Trig("update t set a = 'where ' |"));
+
+        // And the context at that trigger point must be columns, scoped to the FROM table.
+        c = At("select * from CD_WELL_SOURCE where |");
+        Check("WHERE trigger point yields columns",
+            c.Kind == SqlCompletionKind.Columns
+            && c.Tables.Count == 1 && c.Tables[0].Name == "CD_WELL_SOURCE",
+            c.Kind.ToString());
+
         // Nothing meaningful to suggest
         c = At("|");
         Check("empty -> None", c.Kind == SqlCompletionKind.None, c.Kind.ToString());

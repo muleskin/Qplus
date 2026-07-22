@@ -42,17 +42,30 @@ public sealed class SqlCompletionController
         if (e.Text.Length != 1) return;
         var ch = e.Text[0];
 
-        // '.' always re-triggers (alias./schema.). Letters only open a new popup;
-        // if one is already open AvalonEdit narrows it as you keep typing.
+        // '.' always re-triggers (alias./schema.).
         if (ch == '.')
         {
             _window?.Close();
             _ = ShowAsync();
+            return;
         }
-        else if ((char.IsLetter(ch) || ch == '_') && _window is null)
+
+        // Whitespace after a keyword is the real trigger point: while WHERE is still being
+        // typed the nearest keyword is whatever came before it, so a letter-only trigger
+        // would show tables and never re-evaluate once the keyword was complete.
+        if (ch is ' ' or '\t' or ',')
         {
-            _ = ShowAsync();
+            if (SqlContextAnalyzer.IsAfterTriggerKeyword(_editor.Text, _editor.CaretOffset))
+            {
+                _window?.Close();
+                _ = ShowAsync();
+            }
+            return;
         }
+
+        // Letters open a new popup; if one is already open AvalonEdit narrows it as you type.
+        if ((char.IsLetter(ch) || ch == '_') && _window is null)
+            _ = ShowAsync();
     }
 
     private async Task ShowAsync()
@@ -135,16 +148,19 @@ public sealed class SqlCompletionController
 
         foreach (var table in scope)
         {
-            // Resolve the schema when the query didn't qualify the table.
-            var schema = table.Schema;
-            if (string.IsNullOrEmpty(schema))
-            {
-                schema = objects.FirstOrDefault(o =>
-                    string.Equals(o.Name, table.Name, StringComparison.OrdinalIgnoreCase))?.Schema ?? "";
-            }
+            // Resolve against the catalogue so both the schema and the *canonical* name are
+            // used. Passing the name as typed breaks Oracle, where metadata lookups are
+            // case-sensitive and everything is stored upper-case.
+            var known = objects.FirstOrDefault(o =>
+                string.Equals(o.Name, table.Name, StringComparison.OrdinalIgnoreCase)
+                && (string.IsNullOrEmpty(table.Schema)
+                    || string.Equals(o.Schema, table.Schema, StringComparison.OrdinalIgnoreCase)));
+
+            var schema = known?.Schema ?? table.Schema;
+            var name = known?.Name ?? table.Name;
             if (string.IsNullOrEmpty(schema)) continue;
 
-            var columns = await _cache.GetColumnsAsync(conn, schema, table.Name);
+            var columns = await _cache.GetColumnsAsync(conn, schema, name);
             foreach (var col in columns)
             {
                 // With several tables in scope, prefix duplicates so they stay distinguishable.
