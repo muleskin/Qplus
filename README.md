@@ -59,7 +59,7 @@ src/Qplus.Core/        engine abstraction, storage, metadata, sync, crypto
 src/Qplus.App/         WPF application (assembly name: Qplus)
 src/Qplus.Server/      Linux query-sync server (ASP.NET Core)
 tests/Qplus.ReaderTests/   unit + live integration tests
-docs/                  user guide, technical documentation, slide deck
+docs/                  user guide, technical documentation, slide deck, feature matrix
 ```
 
 All dialect-specific behaviour sits behind two interfaces — `IDbEngine` and `IUserAdmin` —
@@ -151,6 +151,7 @@ The database-backed suites are strictly **read-only**.
 - [`docs/Qplus User Guide.docx`](docs/) — day-to-day usage
 - [`docs/Qplus Technical Documentation.docx`](docs/) — architecture, crypto design, testing, pitfalls
 - [`docs/Qplus Feature Overview.pptx`](docs/) — slide deck
+- [`docs/Qplus Feature Matrix.docx`](docs/) — how Qplus compares with SSMS and SQL Developer
 
 ---
 
