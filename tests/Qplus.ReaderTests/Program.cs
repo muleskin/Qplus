@@ -76,6 +76,7 @@ catch (Exception ex)
 
 Console.WriteLine();
 failures += Qplus.ReaderTests.AnalyzerTests.Run();
+failures += Qplus.ReaderTests.CellFormatTests.Run();
 failures += await Qplus.ReaderTests.SyncTests.RunAsync();
 failures += await Qplus.ReaderTests.CryptoTests.RunAsync();
 failures += await Qplus.ReaderTests.IntegrationTests.RunAsync();

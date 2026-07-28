@@ -131,13 +131,15 @@ public partial class QueryDocumentView : UserControl
             {
                 var grid = new DataGrid
                 {
-                    ItemsSource = result.Grids[i].DefaultView,
                     AutoGenerateColumns = true,
                     IsReadOnly = true,
                     CanUserAddRows = false,
                     EnableRowVirtualization = true,
                     Tag = result.Grids[i], // used by CSV export
                 };
+                // Subscribe before ItemsSource so binary columns are caught as they generate.
+                grid.AutoGeneratingColumn += BinaryGridColumns.Fix;
+                grid.ItemsSource = result.Grids[i].DefaultView;
                 ResultTabs.Items.Add(new TabItem { Header = $"Result {i + 1}", Content = grid });
             }
         }
@@ -209,7 +211,7 @@ public partial class QueryDocumentView : UserControl
             {
                 widths[c] = table.Columns[c].ColumnName.Length;
                 foreach (DataRow row in table.Rows)
-                    widths[c] = Math.Max(widths[c], (row[c]?.ToString() ?? "NULL").Length);
+                    widths[c] = Math.Max(widths[c], CellText(row[c]).Length);
                 widths[c] = Math.Min(widths[c], 60);
             }
 
@@ -219,7 +221,7 @@ public partial class QueryDocumentView : UserControl
             foreach (DataRow row in table.Rows)
             {
                 sb.AppendLine(string.Join(" | ", Enumerable.Range(0, table.Columns.Count)
-                    .Select(i => Trunc(row[i]?.ToString() ?? "NULL", widths[i]).PadRight(widths[i]))));
+                    .Select(i => Trunc(CellText(row[i]), widths[i]).PadRight(widths[i]))));
             }
             sb.AppendLine();
         }
@@ -228,4 +230,9 @@ public partial class QueryDocumentView : UserControl
     }
 
     private static string Trunc(string s, int max) => s.Length <= max ? s : s[..(max - 1)] + "…";
+
+    // NULL stays distinct from an empty value in the text view; everything else, binary
+    // included, goes through the shared formatter so "System.Byte[]" never appears.
+    private static string CellText(object? value) =>
+        value is null or DBNull ? "NULL" : CellFormat.Display(value);
 }

@@ -328,19 +328,26 @@ public partial class TableDetailsView : UserControl
         }
     }
 
-    private static DataGrid NewGrid(bool readOnly) => new()
+    private static DataGrid NewGrid(bool readOnly)
     {
-        AutoGenerateColumns = true,
-        IsReadOnly = readOnly,
-        CanUserAddRows = false,
-        CanUserDeleteRows = false,
-        CanUserSortColumns = true,   // click a header to sort
-        CanUserResizeColumns = true,
-        CanUserReorderColumns = true,
-        EnableRowVirtualization = true,
-        SelectionMode = DataGridSelectionMode.Extended,
-        SelectionUnit = DataGridSelectionUnit.FullRow,
-    };
+        var grid = new DataGrid
+        {
+            AutoGenerateColumns = true,
+            IsReadOnly = readOnly,
+            CanUserAddRows = false,
+            CanUserDeleteRows = false,
+            CanUserSortColumns = true,   // click a header to sort
+            CanUserResizeColumns = true,
+            CanUserReorderColumns = true,
+            EnableRowVirtualization = true,
+            SelectionMode = DataGridSelectionMode.Extended,
+            SelectionUnit = DataGridSelectionUnit.FullRow,
+        };
+        // Callers set ItemsSource after this returns, so the handler is in place before
+        // columns generate: binary columns show a size summary, not "System.Byte[]".
+        grid.AutoGeneratingColumn += BinaryGridColumns.Fix;
+        return grid;
+    }
 
     private static StackPanel NewToolbar() => new()
     {

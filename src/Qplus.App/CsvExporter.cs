@@ -1,6 +1,7 @@
 using System.Data;
 using System.IO;
 using System.Text;
+using Qplus.Core.Data;
 
 namespace Qplus.App;
 
@@ -27,8 +28,10 @@ public static class CsvExporter
 
         foreach (DataRow row in table.Rows)
         {
+            // CellFormat renders binary as a size summary rather than "System.Byte[]"; dumping a
+            // blob's bytes into a CSV cell is almost never what an export wants.
             writer.WriteLine(string.Join(",",
-                row.ItemArray.Select(v => Escape(v is null or DBNull ? "" : v.ToString() ?? ""))));
+                row.ItemArray.Select(v => Escape(CellFormat.Display(v)))));
         }
     }
 
