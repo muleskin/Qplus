@@ -346,6 +346,7 @@ public partial class TableDetailsView : UserControl
         // Callers set ItemsSource after this returns, so the handler is in place before
         // columns generate: binary columns show a size summary, not "System.Byte[]".
         grid.AutoGeneratingColumn += BinaryGridColumns.Fix;
+        BinaryGridColumns.EnableViewer(grid);   // double-click a blob to inspect it
         return grid;
     }
 

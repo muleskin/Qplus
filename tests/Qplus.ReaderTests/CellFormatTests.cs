@@ -68,6 +68,19 @@ public static class CellFormatTests
             CellFormat.Display(dt.Rows[0]["photo"]).Contains("BLOB"),
             CellFormat.Display(dt.Rows[0]["photo"]));
 
+        // Content sniffing for the blob viewer's header and Save default extension.
+        var png = BinarySniff.Identify(blob);   // blob above is the PNG signature
+        Check("PNG detected as an image", png is { IsImage: true, Extension: "png" }, png.Label);
+        Check("JPEG detected", BinarySniff.Identify(new byte[] { 0xFF, 0xD8, 0xFF, 0xE0 }).Extension == "jpg");
+        Check("PDF detected, not an image",
+            BinarySniff.Identify(new byte[] { 0x25, 0x50, 0x44, 0x46, 0x2D }) is { IsImage: false, Extension: "pdf" });
+        Check("ZIP/Office detected",
+            BinarySniff.Identify(new byte[] { 0x50, 0x4B, 0x03, 0x04 }).Extension == "zip");
+        Check("unknown bytes fall back to Binary data",
+            BinarySniff.Identify(new byte[] { 0x01, 0x02, 0x03 }) == BinarySniff.Unknown);
+        Check("too-short input does not throw",
+            BinarySniff.Identify(new byte[] { 0x89 }) == BinarySniff.Unknown);
+
         return _failures;
     }
 }

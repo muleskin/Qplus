@@ -139,6 +139,7 @@ public partial class QueryDocumentView : UserControl
                 };
                 // Subscribe before ItemsSource so binary columns are caught as they generate.
                 grid.AutoGeneratingColumn += BinaryGridColumns.Fix;
+                BinaryGridColumns.EnableViewer(grid);   // double-click a blob to inspect it
                 grid.ItemsSource = result.Grids[i].DefaultView;
                 ResultTabs.Items.Add(new TabItem { Header = $"Result {i + 1}", Content = grid });
             }
