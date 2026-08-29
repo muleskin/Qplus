@@ -30,6 +30,7 @@
                 <MenuItem Header="_Execute" InputGestureText="F5" Click="Execute_Click"/>
                 <MenuItem Header="Execute _selection" InputGestureText="Ctrl+F5" Click="ExecuteSelection_Click"/>
                 <MenuItem Header="_Cancel" Click="CancelQuery_Click"/>
+                <MenuItem Header="Clear _messages" Click="ClearMessages_Click"/>
                 <Separator/>
                 <MenuItem Header="_Save query to library…" Click="SaveQuery_Click"/>
                 <MenuItem Header="Query _library…" Click="QueryLibrary_Click"/>

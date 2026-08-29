@@ -385,6 +385,19 @@
         </Style.Triggers>
     </Style>
 
+    <!-- Result grids switch this on (RowHeaderWidth above hides it everywhere else) to show
+         SSMS/SQL-Developer style row numbers. Consolas keeps the padded numbers aligned. -->
+    <Style TargetType="DataGridRowHeader">
+        <Setter Property="Background" Value="{DynamicResource Brush.GridHeader}"/>
+        <Setter Property="Foreground" Value="{DynamicResource Brush.Subtle}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}"/>
+        <Setter Property="BorderThickness" Value="0,0,1,1"/>
+        <Setter Property="FontFamily" Value="Consolas"/>
+        <Setter Property="Padding" Value="4,0,6,0"/>
+        <Setter Property="HorizontalContentAlignment" Value="Right"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+
     <!-- ============ Splitter ============ -->
     <Style TargetType="GridSplitter">
         <Setter Property="Background" Value="{DynamicResource Brush.Border}"/>

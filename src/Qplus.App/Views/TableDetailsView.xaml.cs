@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using System.Windows;
 using System.Windows.Controls;
 using Microsoft.Win32;
@@ -63,12 +63,12 @@ public partial class TableDetailsView : UserControl
     /// <summary>A read-only, sortable grid pane backed by one metadata query.</summary>
     private void AddDetailTab(string header, TableDetailKind kind)
     {
-        var grid = NewGrid(readOnly: true);
+        var grid = NewGrid(readOnly: true, () => $"{_table}_{kind}");
         _detailGrids[kind] = grid;
 
         var bar = NewToolbar();
         bar.Children.Add(NewButton("⟳ Refresh", (_, _) => _ = LoadDetailAsync(kind, force: true)));
-        bar.Children.Add(NewButton("Export CSV…", (_, _) => ExportGrid(grid, $"{_table}_{kind}")));
+        bar.Children.Add(NewButton("Export CSV…", (_, _) => ResultGridMenu.Save(grid, $"{_table}_{kind}", SetStatus)));
 
         var panel = new DockPanel();
         DockPanel.SetDock(bar, Dock.Top);
@@ -81,7 +81,7 @@ public partial class TableDetailsView : UserControl
     /// <summary>The editable data pane.</summary>
     private void AddDataTab()
     {
-        _dataGrid = NewGrid(readOnly: false);
+        _dataGrid = NewGrid(readOnly: false, () => _table);
 
         _rowLimitBox = new TextBox { Text = "200", Width = 60, VerticalAlignment = VerticalAlignment.Center };
         _rowLimitBox.ToolTip = "Maximum rows to fetch";
@@ -99,7 +99,7 @@ public partial class TableDetailsView : UserControl
         bar.Children.Add(NewButton("－ Delete row", (_, _) => DeleteRows()));
         bar.Children.Add(NewButton("💾 Save changes", (_, _) => _ = SaveDataAsync()));
         bar.Children.Add(NewButton("↺ Revert", (_, _) => RevertChanges()));
-        bar.Children.Add(NewButton("Export CSV…", (_, _) => ExportGrid(_dataGrid, _table)));
+        bar.Children.Add(NewButton("Export CSV…", (_, _) => ResultGridMenu.Save(_dataGrid, _table, SetStatus)));
 
         var panel = new DockPanel();
         DockPanel.SetDock(bar, Dock.Top);
@@ -179,11 +179,13 @@ public partial class TableDetailsView : UserControl
             var grid = _detailGrids[kind];
             if (result.Grids.Count > 0)
             {
+                ResultGridColumns.Build(grid, result.Grids[0]);
                 grid.ItemsSource = result.Grids[0].DefaultView;
                 SetStatus($"{kind}: {result.Grids[0].Rows.Count} row(s)");
             }
             else
             {
+                ResultGridColumns.Clear(grid);
                 grid.ItemsSource = null;
                 SetStatus($"{kind}: no data");
             }
@@ -211,6 +213,7 @@ public partial class TableDetailsView : UserControl
         }
 
         _data = table;
+        ResultGridColumns.Build(_dataGrid, table);
         _dataGrid.ItemsSource = table.DefaultView;
 
         var editable = TableDataEditor.IsEditable(table);
@@ -311,28 +314,11 @@ public partial class TableDetailsView : UserControl
 
     // ================= Helpers =================
 
-    private void ExportGrid(DataGrid grid, string suggestedName)
-    {
-        if (grid.ItemsSource is not DataView view) { SetStatus("Nothing to export."); return; }
-
-        var dlg = new SaveFileDialog
-        {
-            Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*",
-            DefaultExt = ".csv",
-            FileName = suggestedName + ".csv",
-        };
-        if (dlg.ShowDialog() == true)
-        {
-            CsvExporter.Write(view.ToTable(), dlg.FileName);
-            SetStatus($"Exported to {dlg.FileName}");
-        }
-    }
-
-    private static DataGrid NewGrid(bool readOnly)
+    private DataGrid NewGrid(bool readOnly, Func<string> suggestedName)
     {
         var grid = new DataGrid
         {
-            AutoGenerateColumns = true,
+            AutoGenerateColumns = false,   // callers build the columns via ResultGridColumns
             IsReadOnly = readOnly,
             CanUserAddRows = false,
             CanUserDeleteRows = false,
@@ -343,9 +329,7 @@ public partial class TableDetailsView : UserControl
             SelectionMode = DataGridSelectionMode.Extended,
             SelectionUnit = DataGridSelectionUnit.FullRow,
         };
-        // Callers set ItemsSource after this returns, so the handler is in place before
-        // columns generate: binary columns show a size summary, not "System.Byte[]".
-        grid.AutoGeneratingColumn += BinaryGridColumns.Fix;
+        ResultGridMenu.Attach(grid, suggestedName, SetStatus);   // right-click: select all / copy / save
         BinaryGridColumns.EnableViewer(grid);   // double-click a blob to inspect it
         return grid;
     }

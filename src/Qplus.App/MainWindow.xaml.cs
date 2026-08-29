@@ -40,8 +40,8 @@ public partial class MainWindow : Window, IShell
             StatusText.Text = "Query library is encrypted and locked — open Query ▸ Encryption… to unlock.";
         }
 
-        InputBindings.Add(new KeyBinding(new RelayCommand(_ => ActiveDoc?.Run(false)), Key.F5, ModifierKeys.None));
-        InputBindings.Add(new KeyBinding(new RelayCommand(_ => ActiveDoc?.Run(true)), Key.F5, ModifierKeys.Control));
+        InputBindings.Add(new KeyBinding(new RelayCommand(_ => ActiveDoc?.Run()), Key.F5, ModifierKeys.None));
+        InputBindings.Add(new KeyBinding(new RelayCommand(_ => ActiveDoc?.Run()), Key.F5, ModifierKeys.Control));
         InputBindings.Add(new KeyBinding(new RelayCommand(_ => NewDocument()), Key.N, ModifierKeys.Control));
         InputBindings.Add(new KeyBinding(new RelayCommand(_ => CloseActiveTab()), Key.W, ModifierKeys.Control));
 
@@ -257,9 +257,10 @@ public partial class MainWindow : Window, IShell
 
     // ================= Query execution (route to active doc) =================
 
-    private void Execute_Click(object sender, RoutedEventArgs e) => ActiveDoc?.Run(false);
-    private void ExecuteSelection_Click(object sender, RoutedEventArgs e) => ActiveDoc?.Run(true);
+    private void Execute_Click(object sender, RoutedEventArgs e) => ActiveDoc?.Run();
+    private void ExecuteSelection_Click(object sender, RoutedEventArgs e) => ActiveDoc?.Run();
     private void CancelQuery_Click(object sender, RoutedEventArgs e) => ActiveDoc?.Cancel();
+    private void ClearMessages_Click(object sender, RoutedEventArgs e) => ActiveDoc?.ClearMessages();
 
     // ================= Saved queries =================
 

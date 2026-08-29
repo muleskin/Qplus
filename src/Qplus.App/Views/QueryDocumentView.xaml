@@ -26,6 +26,8 @@
                           Foreground="{DynamicResource Brush.Text}" Margin="4,0"/>
                 <Button Content="Export CSV…" Click="ExportCsv_Click" Margin="6,0" Padding="6,2"
                         ToolTip="Export the selected result grid to a CSV file"/>
+                <Button Content="🧹 Clear Messages" Click="ClearMessages_Click" Padding="6,2"
+                        ToolTip="Empty the results and messages panes so the next run's output is unmistakable"/>
                 <TextBlock x:Name="StatsText" VerticalAlignment="Center" Margin="10,0"
                            Foreground="{DynamicResource Brush.Text}" Opacity="0.8"/>
             </StackPanel>

@@ -1,8 +1,7 @@
-using System.Data;
+﻿using System.Data;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
-using Microsoft.Win32;
 using Qplus.App.Completion;
 using Qplus.Core.Data;
 using Qplus.Core.Models;
@@ -80,8 +79,17 @@ public partial class QueryDocumentView : UserControl
 
     // ---- Execution -------------------------------------------------------
 
-    private void Execute_Click(object sender, RoutedEventArgs e) => Run(false);
+    private void Execute_Click(object sender, RoutedEventArgs e) => Run();
     private void Cancel_Click(object sender, RoutedEventArgs e) => Cancel();
+    private void ClearMessages_Click(object sender, RoutedEventArgs e) => ClearMessages();
+
+    /// <summary>Empties the output pane so the next run's grids and messages are unmistakably new.</summary>
+    public void ClearMessages()
+    {
+        ShowMessages(Array.Empty<string>());
+        StatsText.Text = string.Empty;
+        StatusChanged?.Invoke(this, "Messages cleared.");
+    }
 
     public void Cancel()
     {
@@ -89,10 +97,19 @@ public partial class QueryDocumentView : UserControl
         StatusChanged?.Invoke(this, "Cancelling…");
     }
 
-    public void Run(bool selectionOnly)
+    /// <summary>
+    /// Runs the highlighted SQL, or the whole tab when nothing is highlighted — in which case
+    /// the text is selected first, so the highlight always shows exactly what was sent.
+    /// </summary>
+    public void Run()
     {
-        var sql = selectionOnly && Editor.SelectionLength > 0 ? Editor.SelectedText : Editor.Text;
-        _ = ExecuteAsync(sql);
+        if (Editor.SelectionLength == 0)
+        {
+            Editor.SelectAll();
+            Editor.Focus();
+        }
+
+        _ = ExecuteAsync(Editor.SelectedText);
     }
 
     public async Task ExecuteAsync(string sql)
@@ -129,57 +146,60 @@ public partial class QueryDocumentView : UserControl
         {
             for (var i = 0; i < result.Grids.Count; i++)
             {
+                var table = result.Grids[i];
+                var label = result.Grids.Count > 1 ? $"{Title}_Result{i + 1}" : Title;
                 var grid = new DataGrid
                 {
-                    AutoGenerateColumns = true,
+                    AutoGenerateColumns = false,
                     IsReadOnly = true,
                     CanUserAddRows = false,
                     EnableRowVirtualization = true,
-                    Tag = result.Grids[i], // used by CSV export
+                    // Cell-level selection, so Copy can take a single value; clicking the row
+                    // number still takes the whole row, as it does in SSMS.
+                    SelectionUnit = DataGridSelectionUnit.CellOrRowHeader,
+                    Tag = label, // suggested file name, for either route to CSV
                 };
-                // Subscribe before ItemsSource so binary columns are caught as they generate.
-                grid.AutoGeneratingColumn += BinaryGridColumns.Fix;
+                // Build the columns rather than letting WPF auto-generate them: it binds by
+                // column name, which blanks out (or throws on) names a query can legitimately
+                // produce — "(no column name)" from SELECT COUNT(*) among them.
+                ResultGridColumns.Build(grid, table);
+                // Right-click: select all / copy / save. The name is resolved on use so a
+                // renamed tab seeds the save dialog with its current name.
+                ResultGridMenu.Attach(grid, () => label, msg => StatusChanged?.Invoke(this, msg));
                 BinaryGridColumns.EnableViewer(grid);   // double-click a blob to inspect it
-                grid.ItemsSource = result.Grids[i].DefaultView;
+                GridRowNumbers.Enable(grid, table.Rows.Count);
+                grid.ItemsSource = table.DefaultView;
                 ResultTabs.Items.Add(new TabItem { Header = $"Result {i + 1}", Content = grid });
             }
         }
 
         ResultTabs.Items.Add(new TabItem { Header = "Messages", Content = MakeTextBox(string.Join("\n", result.Messages)) });
-        if (ResultTabs.Items.Count > 0) ResultTabs.SelectedIndex = 0;
+
+        // A failure belongs in front of the user, not behind a grid tab.
+        ResultTabs.SelectedIndex = result.HasError ? ResultTabs.Items.Count - 1 : 0;
     }
 
     // ---- CSV export ------------------------------------------------------
 
     private void ExportCsv_Click(object sender, RoutedEventArgs e)
     {
-        var table = SelectedGridTable();
-        if (table is null)
+        if (SelectedGrid() is not { } grid)
         {
             MessageBox.Show(Window.GetWindow(this), "Select a result grid to export first.",
                 "Export CSV", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
-        var dlg = new SaveFileDialog
-        {
-            Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*",
-            DefaultExt = ".csv",
-            FileName = $"{Title}.csv",
-        };
-        if (dlg.ShowDialog() == true)
-        {
-            CsvExporter.Write(table, dlg.FileName);
-            StatusChanged?.Invoke(this, $"Exported {table.Rows.Count} rows to {dlg.FileName}");
-        }
+        // Same route as the grid's own "Save Results As…", so both save what is on screen.
+        ResultGridMenu.Save(grid, grid.Tag as string ?? Title, msg => StatusChanged?.Invoke(this, msg));
     }
 
-    private DataTable? SelectedGridTable()
+    private DataGrid? SelectedGrid()
     {
         // Prefer the currently selected result tab if it holds a grid; else the first grid.
-        if (ResultTabs.SelectedItem is TabItem { Content: DataGrid { Tag: DataTable t } }) return t;
+        if (ResultTabs.SelectedItem is TabItem { Content: DataGrid selected }) return selected;
         foreach (var item in ResultTabs.Items)
-            if (item is TabItem { Content: DataGrid { Tag: DataTable first } }) return first;
+            if (item is TabItem { Content: DataGrid first }) return first;
         return null;
     }
 
