@@ -1,6 +1,7 @@
 ﻿using System.Data;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
 using Microsoft.Win32;
 using Qplus.Core.Data;
 using Qplus.Core.Models;
@@ -12,7 +13,7 @@ namespace Qplus.App.Views;
 /// Constraints, Indexes, Triggers, Dependencies, Grants, Statistics and generated SQL.
 /// Panes load lazily on first selection and can each be refreshed.
 /// </summary>
-public partial class TableDetailsView : UserControl
+public partial class TableDetailsView : UserControl, ICommitTarget
 {
     private const string DataTabKey = "__data";
     private const string SqlTabKey = "__sql";
@@ -82,7 +83,8 @@ public partial class TableDetailsView : UserControl
     /// <summary>The editable data pane.</summary>
     private void AddDataTab()
     {
-        _dataGrid = NewGrid(readOnly: false, () => _table, execute: () => _ = ReloadDataAsync());
+        _dataGrid = NewGrid(readOnly: false, () => _table, execute: () => _ = ReloadDataAsync(),
+            commits: CommitActions.For(this));
 
         _rowLimitBox = new TextBox { Text = "200", Width = 60, VerticalAlignment = VerticalAlignment.Center };
         _rowLimitBox.ToolTip = "Maximum rows to fetch";
@@ -214,6 +216,9 @@ public partial class TableDetailsView : UserControl
         }
 
         _data = table;
+        table.RowChanged += (_, _) => QueueCommitStateChanged();
+        table.RowDeleted += (_, _) => QueueCommitStateChanged();
+        QueueCommitStateChanged();
         ResultGridColumns.Build(_dataGrid, table);
         _dataGrid.ItemsSource = table.DefaultView;
 
@@ -227,26 +232,34 @@ public partial class TableDetailsView : UserControl
             : $"{table.Rows.Count} row(s) — read-only: no primary key on this table");
     }
 
-    /// <summary>
-    /// Re-runs the data query — the Refresh button and the grid's Execute. Reloading replaces the
-    /// loaded rows, so unsaved edits would vanish without a word; ask first when there are any.
-    /// </summary>
+    /// <summary>Re-runs the data query — the Data pane's Refresh button and its grid's Execute.</summary>
     private async Task ReloadDataAsync()
     {
-        if (_data is not null)
+        if (!ConfirmDiscardUnsavedEdits("Reload anyway?"))
         {
-            // A cell still being edited isn't part of the change set until it's committed.
-            _dataGrid.CommitEdit(DataGridEditingUnit.Row, true);
-            if (_data.GetChanges() is { } pending)
-            {
-                var reload = MessageBox.Show(Window.GetWindow(this),
-                    $"{pending.Rows.Count} changed row(s) in {_schema}.{_table} haven't been saved and will be lost. Reload anyway?",
-                    "Unsaved changes", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-                if (reload != MessageBoxResult.Yes) { SetStatus("Reload cancelled — unsaved changes kept."); return; }
-            }
+            SetStatus("Reload cancelled — unsaved changes kept.");
+            return;
         }
 
         await LoadDataAsync(force: true);
+    }
+
+    /// <summary>
+    /// Whether the Data pane's loaded rows may be thrown away by a reload: true when nothing is
+    /// unsaved, otherwise the user's answer to <paramref name="question"/>. Reloading replaces the
+    /// rows outright, so without this, unsaved edits would vanish without a word.
+    /// </summary>
+    private bool ConfirmDiscardUnsavedEdits(string question)
+    {
+        if (_data is null) return true;
+
+        // A cell still being edited isn't part of the change set until it's committed.
+        _dataGrid.CommitEdit(DataGridEditingUnit.Row, true);
+        if (_data.GetChanges() is not { } pending) return true;
+
+        return MessageBox.Show(Window.GetWindow(this),
+            $"{pending.Rows.Count} changed row(s) in {_schema}.{_table} haven't been saved and will be lost. {question}",
+            "Unsaved changes", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes;
     }
 
     private async Task LoadDdlAsync(bool force)
@@ -272,6 +285,14 @@ public partial class TableDetailsView : UserControl
 
     private void RefreshAll_Click(object sender, RoutedEventArgs e)
     {
+        // Clearing _loaded reloads the Data pane as well — straight away if it's showing, or the
+        // next time it's opened — so check for unsaved edits whichever tab is in front.
+        if (!ConfirmDiscardUnsavedEdits("Refresh everything anyway?"))
+        {
+            SetStatus("Refresh cancelled — unsaved changes kept.");
+            return;
+        }
+
         _loaded.Clear();
         _ = EnsureLoadedAsync(DetailTabs.SelectedItem as TabItem);
         SetStatus("Refreshed.");
@@ -309,35 +330,104 @@ public partial class TableDetailsView : UserControl
         SetStatus("Pending changes reverted.");
     }
 
-    private async Task SaveDataAsync()
+    /// <summary>
+    /// Writes the Data pane's edits back: the Save changes button, and Commit from the toolbar or
+    /// the Data grid's menu. False when nothing was written — cancelled, or the save failed.
+    /// </summary>
+    private async Task<bool> SaveDataAsync(bool confirm = true)
     {
-        if (_data is null) { SetStatus("Nothing loaded."); return; }
+        if (_data is null) { SetStatus("Nothing loaded."); return true; }
 
         // Commit any cell/row still being edited so it's part of the change set.
         _dataGrid.CommitEdit(DataGridEditingUnit.Row, true);
 
         var pending = _data.GetChanges();
-        if (pending is null) { SetStatus("No changes to save."); return; }
+        if (pending is null) { SetStatus("No changes to save."); return true; }
 
-        var confirm = MessageBox.Show(Window.GetWindow(this),
-            $"Write {pending.Rows.Count} changed row(s) to {_schema}.{_table}?",
-            "Save changes", MessageBoxButton.YesNo, MessageBoxImage.Question);
-        if (confirm != MessageBoxResult.Yes) { SetStatus("Save cancelled."); return; }
+        if (confirm)
+        {
+            var answer = MessageBox.Show(Window.GetWindow(this),
+                $"Write {pending.Rows.Count} changed row(s) to {_schema}.{_table}?",
+                "Save changes", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (answer != MessageBoxResult.Yes) { SetStatus("Save cancelled."); return false; }
+        }
 
         SetStatus("Saving…");
         var result = await TableDataEditor.SaveAsync(_conn, _schema, _table, RowLimit, _data, CancellationToken.None);
         SetStatus(result.Message);
+        QueueCommitStateChanged();
 
         if (!result.Ok)
         {
             MessageBox.Show(Window.GetWindow(this), result.Message, "Save failed",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
+            return false;
         }
+        return true;
+    }
+
+    // ================= Commit / Rollback (toolbar and Data grid menu) =================
+
+    /// <summary>Whether the Data pane holds edits that haven't been saved.</summary>
+    public bool CanCommit =>
+        _data is not null && _data.Rows.Cast<DataRow>().Any(r => r.RowState != DataRowState.Unchanged);
+
+    /// <summary>Raised when the Data pane gains or loses unsaved edits.</summary>
+    public event EventHandler? CommitStateChanged;
+
+    /// <summary>Commit here means saving the Data pane's edits.</summary>
+    public Task CommitAsync() => SaveDataAsync();
+
+    /// <summary>Rollback here means discarding the Data pane's unsaved edits, as Revert does.</summary>
+    public Task RollbackAsync()
+    {
+        RevertChanges();
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Offers to save unsaved Data pane edits before the tab closes.</summary>
+    public async Task<bool> PrepareToCloseAsync()
+    {
+        if (_data is null) return true;
+
+        // A cell still being edited isn't part of the change set until it's committed.
+        _dataGrid.CommitEdit(DataGridEditingUnit.Row, true);
+        if (_data.GetChanges() is not { } pending) return true;
+
+        var answer = MessageBox.Show(Window.GetWindow(this),
+            $"{pending.Rows.Count} changed row(s) in {_schema}.{_table} haven't been saved.\n\n" +
+            "Save them before closing?\n\nYes: save\nNo: discard\nCancel: keep the tab open",
+            "Unsaved changes", MessageBoxButton.YesNoCancel, MessageBoxImage.Warning);
+
+        return answer switch
+        {
+            MessageBoxResult.Yes => await SaveDataAsync(confirm: false),
+            MessageBoxResult.No => true,
+            _ => false,
+        };
+    }
+
+    private bool _commitStateQueued;
+
+    /// <summary>
+    /// Raises <see cref="CommitStateChanged"/> once the current burst of row events has settled:
+    /// a save or revert touches every changed row, and each would otherwise recount them all.
+    /// </summary>
+    private void QueueCommitStateChanged()
+    {
+        if (_commitStateQueued) return;
+        _commitStateQueued = true;
+        Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() =>
+        {
+            _commitStateQueued = false;
+            CommitStateChanged?.Invoke(this, EventArgs.Empty);
+        }));
     }
 
     // ================= Helpers =================
 
-    private DataGrid NewGrid(bool readOnly, Func<string> suggestedName, Action execute)
+    private DataGrid NewGrid(bool readOnly, Func<string> suggestedName, Action execute,
+        CommitActions? commits = null)
     {
         var grid = new DataGrid
         {
@@ -354,7 +444,8 @@ public partial class TableDetailsView : UserControl
         };
         // Right-click: execute / select all / copy / save. Execute re-runs this pane's query, as
         // its Refresh button does. No F5 label: F5 runs query tabs and does nothing in this view.
-        ResultGridMenu.Attach(grid, suggestedName, SetStatus, execute, executeGesture: "");
+        // The Data grid adds Commit / Rollback, which save or discard its edits.
+        ResultGridMenu.Attach(grid, suggestedName, SetStatus, execute, executeGesture: "", commits: commits);
         BinaryGridColumns.EnableViewer(grid);   // double-click a blob to inspect it
         return grid;
     }

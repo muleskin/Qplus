@@ -1,4 +1,4 @@
-<Window x:Class="Qplus.App.MainWindow"
+﻿<Window x:Class="Qplus.App.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:Qplus.App.ViewModels"
@@ -30,6 +30,8 @@
                 <MenuItem Header="_Execute" InputGestureText="F5" Click="Execute_Click"/>
                 <MenuItem Header="Execute _selection" InputGestureText="Ctrl+F5" Click="ExecuteSelection_Click"/>
                 <MenuItem Header="_Cancel" Click="CancelQuery_Click"/>
+                <MenuItem x:Name="CommitMenuItem" Header="C_ommit" Click="Commit_Click" IsEnabled="False"/>
+                <MenuItem x:Name="RollbackMenuItem" Header="_Rollback" Click="Rollback_Click" IsEnabled="False"/>
                 <MenuItem Header="Clear _messages" Click="ClearMessages_Click"/>
                 <Separator/>
                 <MenuItem Header="_Save query to library…" Click="SaveQuery_Click"/>
@@ -62,6 +64,10 @@
             <ToolBar Background="{DynamicResource Brush.Panel}">
                 <Button Content="＋ New Query" Click="NewQuery_Click" Padding="6,2"/>
                 <Button Content="▶ Execute (F5)" Click="Execute_Click" Margin="6,0" Padding="6,2"/>
+                <Button x:Name="CommitButton" Content="✔ Commit" Click="Commit_Click" Padding="6,2" IsEnabled="False"
+                        ToolTip="Commit the active tab: its open transaction, or a table's unsaved Data pane edits"/>
+                <Button x:Name="RollbackButton" Content="↶ Rollback" Click="Rollback_Click" Margin="6,0" Padding="6,2" IsEnabled="False"
+                        ToolTip="Roll back the active tab: undo its open transaction, or discard a table's unsaved Data pane edits"/>
                 <Separator/>
                 <TextBlock Text="Saved:" VerticalAlignment="Center" Margin="4,0"
                            Foreground="{DynamicResource Brush.Text}"/>
@@ -125,7 +131,8 @@
                           Background="{DynamicResource Brush.Border}"/>
 
             <!-- Query document tabs -->
-            <TabControl Grid.Column="2" x:Name="DocTabs" Background="{DynamicResource Brush.Bg}"/>
+            <TabControl Grid.Column="2" x:Name="DocTabs" Background="{DynamicResource Brush.Bg}"
+                        SelectionChanged="DocTabs_SelectionChanged"/>
         </Grid>
     </DockPanel>
 </Window>

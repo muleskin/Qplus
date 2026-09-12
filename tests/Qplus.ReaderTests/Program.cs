@@ -80,6 +80,7 @@ failures += Qplus.ReaderTests.CellFormatTests.Run();
 failures += await Qplus.ReaderTests.SyncTests.RunAsync();
 failures += await Qplus.ReaderTests.CryptoTests.RunAsync();
 failures += await Qplus.ReaderTests.IntegrationTests.RunAsync();
+failures += await Qplus.ReaderTests.TransactionTests.RunAsync();
 
 Console.WriteLine();
 Console.WriteLine(failures == 0 ? "ALL TESTS PASSED" : $"{failures} TEST(S) FAILED");

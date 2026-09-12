@@ -11,9 +11,10 @@ using Qplus.Core.Data;
 namespace Qplus.App.Views;
 
 /// <summary>
-/// The SSMS-style right-click menu on a result grid: Execute (when the grid has a query to
-/// re-run), Select All, Copy, Copy with Headers and Save Results As. Each column contributes the
-/// same text it displays, so a blob copies as its size summary rather than "System.Byte[]".
+/// The SSMS-style right-click menu on a result grid: Execute, Commit and Rollback (when the grid
+/// has a query to re-run or changes to settle), Select All, Copy, Copy with Headers and Save
+/// Results As. Each column contributes the same text it displays, so a blob copies as its size
+/// summary rather than "System.Byte[]".
 /// </summary>
 internal static class ResultGridMenu
 {
@@ -22,10 +23,11 @@ internal static class ResultGridMenu
     /// <paramref name="suggestedName"/> seeds the save dialog's file name, and
     /// <paramref name="status"/> reports where the file went. Passing <paramref name="execute"/>
     /// adds an Execute item that re-runs whatever query fills the grid, labelled with
-    /// <paramref name="executeGesture"/> — pass "" where no key does the same thing.
+    /// <paramref name="executeGesture"/> — pass "" where no key does the same thing. Passing
+    /// <paramref name="commits"/> adds Commit and Rollback beside it.
     /// </summary>
     public static void Attach(DataGrid grid, Func<string> suggestedName, Action<string>? status = null,
-        Action? execute = null, string executeGesture = "F5")
+        Action? execute = null, string executeGesture = "F5", CommitActions? commits = null)
     {
         var selectAll = NewItem("Select _All", "Ctrl+A", () => grid.SelectAll());
         var copy = NewItem("_Copy", "Ctrl+C", () => Copy(grid, includeHeaders: false));
@@ -34,12 +36,12 @@ internal static class ResultGridMenu
         var save = NewItem("_Save Results As…", "", () => Save(grid, suggestedName(), status));
 
         var menu = new ContextMenu();
-        if (execute is not null)
-        {
-            // Keys are bound elsewhere (F5 at the window), so the gesture here is a label only.
-            menu.Items.Add(NewItem("E_xecute", executeGesture, execute));
-            menu.Items.Add(new Separator());
-        }
+
+        // Keys are bound elsewhere (F5 at the window), so the gesture here is a label only.
+        if (execute is not null) menu.Items.Add(NewItem("E_xecute", executeGesture, execute));
+        if (commits is not null) CommitMenuItems.Add(menu, commits);
+        if (menu.Items.Count > 0) menu.Items.Add(new Separator());
+
         menu.Items.Add(selectAll);
         menu.Items.Add(new Separator());
         menu.Items.Add(copy);

@@ -11,16 +11,27 @@
             <RowDefinition Height="3*" MinHeight="100"/>
         </Grid.RowDefinitions>
 
-        <!-- Per-document action bar -->
+        <!-- Per-document action bar. Wraps rather than clipping when the tab is narrow. -->
         <Border Grid.Row="0" Background="{DynamicResource Brush.Panel}" Padding="4"
                 BorderBrush="{DynamicResource Brush.Border}" BorderThickness="0,0,0,1">
-            <StackPanel Orientation="Horizontal">
+            <WrapPanel>
                 <TextBlock Text="Connection:" VerticalAlignment="Center" Margin="4,0"
                            Foreground="{DynamicResource Brush.Text}"/>
                 <ComboBox x:Name="ConnectionCombo" Width="200" VerticalAlignment="Center"
                           ToolTip="Connection this query runs against"/>
                 <Button Content="▶ Execute (F5)" Click="Execute_Click" Margin="6,0" Padding="6,2"/>
                 <Button Content="■ Cancel" Click="Cancel_Click" Padding="6,2"/>
+                <Separator Margin="6,0"/>
+                <CheckBox x:Name="AutoCommitBox" Content="Auto-commit" IsChecked="True" VerticalAlignment="Center"
+                          Foreground="{DynamicResource Brush.Text}" Margin="4,0" Click="AutoCommit_Click"
+                          ToolTip="Ticked: each statement is saved as soon as it runs. Unticked: changes are held in a transaction until you Commit or Roll back."/>
+                <Button x:Name="CommitButton" Content="✔ Commit" Click="Commit_Click" Margin="6,0,0,0" Padding="6,2"
+                        IsEnabled="False" ToolTip="Make this tab's open transaction permanent"/>
+                <Button x:Name="RollbackButton" Content="↶ Rollback" Click="Rollback_Click" Margin="6,0" Padding="6,2"
+                        IsEnabled="False" ToolTip="Undo everything run in this tab's open transaction"/>
+                <TextBlock x:Name="TransactionText" Text="● Transaction open" VerticalAlignment="Center" Margin="4,0"
+                           Foreground="{DynamicResource Brush.Accent}" Visibility="Collapsed"
+                           ToolTip="Nothing run in this tab is saved until you Commit. Other sessions may wait on rows it has locked."/>
                 <Separator Margin="6,0"/>
                 <CheckBox x:Name="ResultsAsTextBox" Content="Results as text" VerticalAlignment="Center"
                           Foreground="{DynamicResource Brush.Text}" Margin="4,0"/>
@@ -30,7 +41,7 @@
                         ToolTip="Empty the results and messages panes so the next run's output is unmistakable"/>
                 <TextBlock x:Name="StatsText" VerticalAlignment="Center" Margin="10,0"
                            Foreground="{DynamicResource Brush.Text}" Opacity="0.8"/>
-            </StackPanel>
+            </WrapPanel>
         </Border>
 
         <Border Grid.Row="1" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1">

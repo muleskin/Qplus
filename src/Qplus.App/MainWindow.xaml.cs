@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -138,8 +138,16 @@ public partial class MainWindow : Window, IShell
         if (DocTabs.SelectedItem is TabItem tab) CloseTab(tab);
     }
 
-    private void CloseTab(TabItem tab)
+    private async void CloseTab(TabItem tab)
     {
+        // Anything uncommitted in the tab (an open transaction, unsaved Data pane edits) is
+        // settled first, and the user can call the close off.
+        if (tab.Content is ICommitTarget target)
+        {
+            if (target.CanCommit) DocTabs.SelectedItem = tab;   // show which tab is asking
+            if (!await target.PrepareToCloseAsync()) return;
+        }
+
         DocTabs.Items.Remove(tab);
         if (DocTabs.Items.Count == 0) NewDocument();
     }
@@ -261,6 +269,64 @@ public partial class MainWindow : Window, IShell
     private void ExecuteSelection_Click(object sender, RoutedEventArgs e) => ActiveDoc?.Run();
     private void CancelQuery_Click(object sender, RoutedEventArgs e) => ActiveDoc?.Cancel();
     private void ClearMessages_Click(object sender, RoutedEventArgs e) => ActiveDoc?.ClearMessages();
+
+    // ================= Commit / Rollback (route to the active tab) =================
+
+    private ICommitTarget? _commitTarget;
+
+    private ICommitTarget? ActiveCommitTarget => (DocTabs.SelectedItem as TabItem)?.Content as ICommitTarget;
+
+    private void DocTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        // A query tab's result panes and the details view's panes are TabControls too, and
+        // their SelectionChanged bubbles up through this one.
+        if (!ReferenceEquals(e.OriginalSource, DocTabs)) return;
+
+        if (_commitTarget is not null) _commitTarget.CommitStateChanged -= CommitTarget_StateChanged;
+        _commitTarget = ActiveCommitTarget;
+        if (_commitTarget is not null) _commitTarget.CommitStateChanged += CommitTarget_StateChanged;
+        UpdateCommitButtons();
+    }
+
+    private void CommitTarget_StateChanged(object? sender, EventArgs e) => UpdateCommitButtons();
+
+    private void UpdateCommitButtons()
+    {
+        var pending = _commitTarget?.CanCommit == true;
+        CommitButton.IsEnabled = RollbackButton.IsEnabled = pending;
+        CommitMenuItem.IsEnabled = RollbackMenuItem.IsEnabled = pending;
+    }
+
+    private void Commit_Click(object sender, RoutedEventArgs e) => _ = ActiveCommitTarget?.CommitAsync();
+    private void Rollback_Click(object sender, RoutedEventArgs e) => _ = ActiveCommitTarget?.RollbackAsync();
+
+    private bool _closeSettled;
+
+    /// <summary>
+    /// Holds the window open while any tab has something uncommitted, settling each in turn.
+    /// Settling can mean a commit or a save — async work a closing window can't wait on — so
+    /// the first close is cancelled and the window closes again once every tab is settled.
+    /// </summary>
+    protected override async void OnClosing(System.ComponentModel.CancelEventArgs e)
+    {
+        base.OnClosing(e);
+        if (_closeSettled || e.Cancel) return;
+
+        var pending = DocTabs.Items.OfType<TabItem>()
+            .Where(t => t.Content is ICommitTarget { CanCommit: true })
+            .ToList();
+        if (pending.Count == 0) return;
+
+        e.Cancel = true;
+        foreach (var tab in pending)
+        {
+            DocTabs.SelectedItem = tab;
+            if (!await ((ICommitTarget)tab.Content).PrepareToCloseAsync()) return;   // user kept it
+        }
+
+        _closeSettled = true;
+        Close();
+    }
 
     // ================= Saved queries =================
 

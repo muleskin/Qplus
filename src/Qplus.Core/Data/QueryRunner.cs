@@ -8,30 +8,35 @@ namespace Qplus.Core.Data;
 /// <summary>Executes a SQL batch against a connection and collects grids + messages.</summary>
 public static class QueryRunner
 {
-    public static async Task<QueryExecutionResult> ExecuteAsync(
+    /// <summary>
+    /// Runs <paramref name="sql"/> on a connection of its own, opened for the call and closed
+    /// after it. This is auto-commit: each statement is permanent as soon as it runs. For work
+    /// held until an explicit commit, see <see cref="QuerySession"/>.
+    /// </summary>
+    public static Task<QueryExecutionResult> ExecuteAsync(
         ConnectionInfo info, string sql, CancellationToken ct)
     {
         var engine = DbEngines.For(info);
+        return RunAsync(async result =>
+        {
+            await using var conn = engine.CreateConnection(engine.BuildConnectionString(info));
+            await conn.OpenAsync(ct);
+            await RunBatchesAsync(engine, conn, null, sql, result, ct);
+        });
+    }
+
+    /// <summary>
+    /// Times <paramref name="work"/> and turns its failures into messages, so every route to the
+    /// database reports the same way.
+    /// </summary>
+    internal static async Task<QueryExecutionResult> RunAsync(Func<QueryExecutionResult, Task> work)
+    {
         var result = new QueryExecutionResult();
         var sw = Stopwatch.StartNew();
 
         try
         {
-            await using var conn = engine.CreateConnection(engine.BuildConnectionString(info));
-            await conn.OpenAsync(ct);
-
-            // Capture PRINT / info messages (fired on this thread during execution).
-            using var _messages = engine.CaptureMessages(conn, msg => result.Messages.Add(msg));
-
-            foreach (var batch in engine.SplitBatches(sql))
-            {
-                await using var cmd = conn.CreateCommand();
-                cmd.CommandText = batch;
-                cmd.CommandTimeout = 0; // let long queries run; user can cancel
-
-                await using var reader = await cmd.ExecuteReaderAsync(ct);
-                await CollectResultsAsync(reader, result, ct);
-            }
+            await work(result);
         }
         catch (OperationCanceledException)
         {
@@ -55,6 +60,31 @@ public static class QueryRunner
             result.Messages.Add("Commands completed successfully.");
 
         return result;
+    }
+
+    /// <summary>
+    /// Runs each batch of <paramref name="sql"/> on an open connection, inside
+    /// <paramref name="transaction"/> when there is one.
+    /// </summary>
+    internal static async Task RunBatchesAsync(IDbEngine engine, DbConnection conn,
+        DbTransaction? transaction, string sql, QueryExecutionResult result, CancellationToken ct)
+    {
+        // Capture PRINT / info messages (fired on this thread during execution).
+        using var _messages = engine.CaptureMessages(conn, msg => result.Messages.Add(msg));
+
+        foreach (var batch in engine.SplitBatches(sql))
+        {
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = batch;
+            cmd.CommandTimeout = 0; // let long queries run; user can cancel
+
+            // SQL Server refuses to run a command on a connection with a transaction open unless
+            // the command is enlisted in it explicitly.
+            if (transaction is not null) cmd.Transaction = transaction;
+
+            await using var reader = await cmd.ExecuteReaderAsync(ct);
+            await CollectResultsAsync(reader, result, ct);
+        }
     }
 
     /// <summary>
