@@ -18,6 +18,7 @@ public partial class QueryDocumentView : UserControl
     public QueryDocumentView()
     {
         InitializeComponent();
+        EditorMenu.Attach(Editor);   // right-click: cut / copy / paste / select all
         ShowMessages(new[] { "Ready. Choose a connection, write SQL, press F5." });
         ConnectionCombo.SelectionChanged += (_, _) => PrewarmSchema();
     }
