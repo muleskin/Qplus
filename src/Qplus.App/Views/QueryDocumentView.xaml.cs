@@ -164,9 +164,10 @@ public partial class QueryDocumentView : UserControl
                 // column name, which blanks out (or throws on) names a query can legitimately
                 // produce — "(no column name)" from SELECT COUNT(*) among them.
                 ResultGridColumns.Build(grid, table);
-                // Right-click: select all / copy / save. The name is resolved on use so a
-                // renamed tab seeds the save dialog with its current name.
-                ResultGridMenu.Attach(grid, () => label, msg => StatusChanged?.Invoke(this, msg));
+                // Right-click: execute / select all / copy / save. Execute re-runs the query
+                // exactly as F5 does. The name is resolved on use so a renamed tab seeds the
+                // save dialog with its current name.
+                ResultGridMenu.Attach(grid, () => label, msg => StatusChanged?.Invoke(this, msg), Run);
                 BinaryGridColumns.EnableViewer(grid);   // double-click a blob to inspect it
                 GridRowNumbers.Enable(grid, table.Rows.Count);
                 grid.ItemsSource = table.DefaultView;
