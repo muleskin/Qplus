@@ -63,7 +63,8 @@ public partial class TableDetailsView : UserControl
     /// <summary>A read-only, sortable grid pane backed by one metadata query.</summary>
     private void AddDetailTab(string header, TableDetailKind kind)
     {
-        var grid = NewGrid(readOnly: true, () => $"{_table}_{kind}");
+        var grid = NewGrid(readOnly: true, () => $"{_table}_{kind}",
+            execute: () => _ = LoadDetailAsync(kind, force: true));
         _detailGrids[kind] = grid;
 
         var bar = NewToolbar();
@@ -81,7 +82,7 @@ public partial class TableDetailsView : UserControl
     /// <summary>The editable data pane.</summary>
     private void AddDataTab()
     {
-        _dataGrid = NewGrid(readOnly: false, () => _table);
+        _dataGrid = NewGrid(readOnly: false, () => _table, execute: () => _ = ReloadDataAsync());
 
         _rowLimitBox = new TextBox { Text = "200", Width = 60, VerticalAlignment = VerticalAlignment.Center };
         _rowLimitBox.ToolTip = "Maximum rows to fetch";
@@ -94,7 +95,7 @@ public partial class TableDetailsView : UserControl
             Margin = new Thickness(2, 0, 4, 0),
         });
         bar.Children.Add(_rowLimitBox);
-        bar.Children.Add(NewButton("⟳ Refresh", (_, _) => _ = LoadDataAsync(force: true)));
+        bar.Children.Add(NewButton("⟳ Refresh", (_, _) => _ = ReloadDataAsync()));
         bar.Children.Add(NewButton("＋ Add row", (_, _) => AddRow()));
         bar.Children.Add(NewButton("－ Delete row", (_, _) => DeleteRows()));
         bar.Children.Add(NewButton("💾 Save changes", (_, _) => _ = SaveDataAsync()));
@@ -226,6 +227,28 @@ public partial class TableDetailsView : UserControl
             : $"{table.Rows.Count} row(s) — read-only: no primary key on this table");
     }
 
+    /// <summary>
+    /// Re-runs the data query — the Refresh button and the grid's Execute. Reloading replaces the
+    /// loaded rows, so unsaved edits would vanish without a word; ask first when there are any.
+    /// </summary>
+    private async Task ReloadDataAsync()
+    {
+        if (_data is not null)
+        {
+            // A cell still being edited isn't part of the change set until it's committed.
+            _dataGrid.CommitEdit(DataGridEditingUnit.Row, true);
+            if (_data.GetChanges() is { } pending)
+            {
+                var reload = MessageBox.Show(Window.GetWindow(this),
+                    $"{pending.Rows.Count} changed row(s) in {_schema}.{_table} haven't been saved and will be lost. Reload anyway?",
+                    "Unsaved changes", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+                if (reload != MessageBoxResult.Yes) { SetStatus("Reload cancelled — unsaved changes kept."); return; }
+            }
+        }
+
+        await LoadDataAsync(force: true);
+    }
+
     private async Task LoadDdlAsync(bool force)
     {
         if (!force && !_loaded.Add(SqlTabKey)) return;
@@ -314,7 +337,7 @@ public partial class TableDetailsView : UserControl
 
     // ================= Helpers =================
 
-    private DataGrid NewGrid(bool readOnly, Func<string> suggestedName)
+    private DataGrid NewGrid(bool readOnly, Func<string> suggestedName, Action execute)
     {
         var grid = new DataGrid
         {
@@ -329,7 +352,9 @@ public partial class TableDetailsView : UserControl
             SelectionMode = DataGridSelectionMode.Extended,
             SelectionUnit = DataGridSelectionUnit.FullRow,
         };
-        ResultGridMenu.Attach(grid, suggestedName, SetStatus);   // right-click: select all / copy / save
+        // Right-click: execute / select all / copy / save. Execute re-runs this pane's query, as
+        // its Refresh button does. No F5 label: F5 runs query tabs and does nothing in this view.
+        ResultGridMenu.Attach(grid, suggestedName, SetStatus, execute, executeGesture: "");
         BinaryGridColumns.EnableViewer(grid);   // double-click a blob to inspect it
         return grid;
     }
