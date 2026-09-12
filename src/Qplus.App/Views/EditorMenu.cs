@@ -5,16 +5,25 @@ using ICSharpCode.AvalonEdit;
 namespace Qplus.App.Views;
 
 /// <summary>
-/// The right-click menu for a SQL editor: Cut, Copy, Paste and Select All. AvalonEdit already
-/// binds the keyboard shortcuts but ships with no context menu at all, so right-clicking a
-/// selection did nothing.
+/// The right-click menu for a SQL editor: Execute, then Cut, Copy, Paste and Select All.
+/// AvalonEdit already binds the editing shortcuts but ships with no context menu at all, so
+/// right-clicking a selection did nothing.
 /// </summary>
 internal static class EditorMenu
 {
-    /// <summary>Gives the editor its context menu. Call once per editor.</summary>
-    public static void Attach(TextEditor editor)
+    /// <summary>
+    /// Gives the editor its context menu. Call once per editor. <paramref name="execute"/> runs
+    /// the query — the highlighted SQL, or the whole editor when nothing is highlighted.
+    /// </summary>
+    public static void Attach(TextEditor editor, Action execute)
     {
+        // F5 itself is bound at the window, so the gesture here is a label, not a second binding.
+        var run = new MenuItem { Header = "E_xecute", InputGestureText = "F5" };
+        run.Click += (_, _) => execute();
+
         var menu = new ContextMenu();
+        menu.Items.Add(run);
+        menu.Items.Add(new Separator());
         menu.Items.Add(NewItem("Cu_t", ApplicationCommands.Cut, editor));
         menu.Items.Add(NewItem("_Copy", ApplicationCommands.Copy, editor));
         menu.Items.Add(NewItem("_Paste", ApplicationCommands.Paste, editor));
